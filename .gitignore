@@ -1,0 +1,79 @@
+# ============== Unity ==============
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# Asset meta data should always be kept
+!/[Aa]ssets/**/*.meta
+
+# Auto-generated solution / project files
+*.csproj
+*.unityproj
+*.sln
+*.slnx
+*.slnx-keepalive
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.slnx.suo
+
+# Unity Crash Reports
+sysinfo.txt
+
+# Builds
+*.apk
+*.aab
+*.ipa
+*.exe
+*.x86_64
+*.x86
+*.app/
+
+# Addressables build cache (built content goes to ServerData/, ignore)
+[Aa]ssets/AddressableAssetsData/*/*.bin*
+[Ss]erver[Dd]ata/
+
+# Crashlytics generated
+crashlytics-build.properties
+
+# Firebase service files (don't commit secrets — use per-env)
+google-services.json
+GoogleService-Info.plist
+
+# Per-game encryption seeds — committed `.example` only
+[Aa]ssets/[Rr]esources/ZeroSecrets.asset
+[Aa]ssets/[Rr]esources/ZeroSecrets.asset.meta
+
+# Per-user Claude Code settings (project-level shared settings.json may be committed)
+.claude/settings.local.json
+
+# ============== OS ==============
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ============== IDE ==============
+.idea/
+.vs/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+*.swp

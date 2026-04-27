@@ -1,0 +1,17 @@
+{
+    "name": "Zero.Core",
+    "rootNamespace": "Zero.Core",
+    "references": [
+        "UniTask",
+        "R3"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

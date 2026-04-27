@@ -1,0 +1,19 @@
+{
+    "name": "Zero.Services.DeviceProfile",
+    "rootNamespace": "Zero.Services.DeviceProfile",
+    "references": [
+        "Zero.Core",
+        "Zero.Infrastructure",
+        "UniTask",
+        "Reflex"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

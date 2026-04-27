@@ -1,0 +1,52 @@
+{
+    "name": "Zero.Tests.PlayMode",
+    "rootNamespace": "Zero.Tests.PlayMode",
+    "references": [
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner",
+        "Zero.Core",
+        "Zero.Infrastructure",
+        "Zero.Services.AdPlacement",
+        "Zero.Services.Ads",
+        "Zero.Services.Analytics",
+        "Zero.Services.Asset",
+        "Zero.Services.Attribution",
+        "Zero.Services.Audio",
+        "Zero.Services.Consent",
+        "Zero.Services.Crashlytics",
+        "Zero.Services.DeviceProfile",
+        "Zero.Services.IAP",
+        "Zero.Services.Input",
+        "Zero.Services.Log",
+        "Zero.Services.Notification",
+        "Zero.Services.Pool",
+        "Zero.Services.ReceiptValidator",
+        "Zero.Services.RemoteConfig",
+        "Zero.Services.Save",
+        "Zero.Services.Scene",
+        "Zero.Services.Time",
+        "Zero.Meta",
+        "Zero.UI",
+        "Zero.Gameplay",
+        "Zero.Bootstrap",
+        "UniTask",
+        "R3",
+        "Reflex",
+        "LitMotion"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,0 +1,22 @@
+{
+    "name": "Zero.UI",
+    "rootNamespace": "Zero.UI",
+    "references": [
+        "Zero.Core",
+        "Zero.Infrastructure",
+        "Zero.Meta",
+        "UniTask",
+        "R3",
+        "Reflex",
+        "LitMotion"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

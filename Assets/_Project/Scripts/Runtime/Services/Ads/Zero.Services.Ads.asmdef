@@ -1,0 +1,20 @@
+{
+    "name": "Zero.Services.Ads",
+    "rootNamespace": "Zero.Services.Ads",
+    "references": [
+        "Zero.Core",
+        "Zero.Infrastructure",
+        "UniTask",
+        "R3",
+        "Reflex"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

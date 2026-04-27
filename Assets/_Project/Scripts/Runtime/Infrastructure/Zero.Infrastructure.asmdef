@@ -1,0 +1,19 @@
+{
+    "name": "Zero.Infrastructure",
+    "rootNamespace": "Zero.Infrastructure",
+    "references": [
+        "Zero.Core",
+        "UniTask",
+        "R3",
+        "Reflex"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
