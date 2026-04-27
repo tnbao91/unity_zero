@@ -1,0 +1,19 @@
+{
+    "name": "Zero.Services.Events",
+    "rootNamespace": "Zero.Services.Events",
+    "references": [
+        "Zero.Core",
+        "UniTask",
+        "R3",
+        "Reflex"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
