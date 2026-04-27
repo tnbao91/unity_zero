@@ -1,0 +1,22 @@
+{
+    "name": "Zero.Services.Localization",
+    "rootNamespace": "Zero.Services.Localization",
+    "references": [
+        "Zero.Core",
+        "Zero.Infrastructure",
+        "UniTask",
+        "R3",
+        "Reflex",
+        "Unity.Localization",
+        "Unity.Addressables"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
