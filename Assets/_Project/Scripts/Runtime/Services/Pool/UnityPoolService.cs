@@ -29,7 +29,15 @@ namespace Zero.Services.Pool
             {
                 ct.ThrowIfCancellationRequested();
                 pool.Prewarm();
-                if (i % 8 == 0) await UniTask.Yield(ct); // breathe
+                // Yield every 8 instances during play mode to avoid frame hitches
+                // when prewarming large pools. EditMode skips the yield because
+                // UniTask.Yield defaults to PlayerLoopTiming.Update which does not
+                // tick in editor scripts; the await would otherwise abort the loop
+                // after the first prewarm and break tests.
+                if (Application.isPlaying && (i + 1) % 8 == 0)
+                {
+                    await UniTask.Yield(ct);
+                }
             }
         }
 
