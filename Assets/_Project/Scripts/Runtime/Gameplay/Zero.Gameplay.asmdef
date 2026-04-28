@@ -4,8 +4,7 @@
     "references": [
         "Zero.Core",
         "Zero.Infrastructure",
-        "Zero.Meta",
-        "Zero.UI",
+        "Zero.Services.Events",
         "UniTask",
         "R3",
         "Reflex",
