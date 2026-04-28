@@ -111,7 +111,7 @@ namespace Zero.Bootstrap
                     new ConsentStep(consent),
                     new RemoteConfigStep(remote),
                     new AnalyticsStep(analytics),
-                    new LocalizationStep(l10n),
+                    new LocalizationStep(l10n, log),
                     new AttributionStep(attrib),
                     new AdsStep(ads, placement),
                     new IapStep(iap),
