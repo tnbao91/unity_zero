@@ -85,6 +85,7 @@ Most third-party SDK integrations (Ads, IAP, Analytics, Crashlytics, RemoteConfi
 - **CI is configured:** `.github/workflows/tests.yml` runs EditMode tests on push + PR. Requires `UNITY_LICENSE` secret set per game-ci docs.
 - **Documentation is co-located:** 8 module docs under `docs/` (architecture, services, security, testing) follow the fixed format: Overview / Public API / Extension Points / Examples / Known Limitations / Design Rationale. See `docs/testing/writing-tests.md` and `docs/testing/ci.md` for test patterns.
 - **Plan + journal are source of truth for in-flight work.** `docs/dev/PLAN.md` defines phases + decisions; `docs/dev/JOURNAL.md` is append-only history of what landed. After every phase, update the journal AND this CLAUDE.md before merging — see `feedback_phase_workflow.md` in user memory.
+- **Read `docs/dev/PITFALLS.md` before extending any of: pool service, bootstrap pipeline, save service, localization, asmdef references, or NuGet plugin metas.** Each entry there came out of a real bug that wasn't caught until tests or runtime exposed it. Keep it updated as new footguns surface.
 
 ## Build & test
 
