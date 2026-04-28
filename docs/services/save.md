@@ -26,23 +26,27 @@ public sealed class EncryptedJsonSaveService : ISaveService, IDisposable { ... }
 
 ## Extension Points
 
-**Migration callback:** override the internal `Migrate(JObject data, int from, int to)` method to transform old save formats:
+**Migrations.** `EncryptedJsonSaveService` is `sealed` and `Migrate(JObject, int from, int to)` is `private static`, so per-game migrations are written by editing that method directly. v1 ships as a no-op:
 
 ```csharp
-// In a custom subclass or via patches:
 private static JObject Migrate(JObject data, int from, int to)
 {
     if (from == 0 && to == 1)
     {
-        // v0 used "player_level" key, v1 uses "level"
-        data["level"] = data["player_level"];
-        data.Remove("player_level");
+        // v0 used "player_level"; v1 uses "level".
+        if (data["player_level"] != null)
+        {
+            data["level"] = data["player_level"];
+            data.Remove("player_level");
+        }
     }
     return data;
 }
 ```
 
-**Reset behavior:** by design, decryption failure (HMAC mismatch, corrupt ciphertext) does NOT throw; instead, the service logs the error and resets `_data` to empty. This is recoverable for single-slot, casual games. For hardcore economy or leaderboards, implement a `IFailLoudHandler` extension point (future) to throw and block login instead.
+If your game needs migration coverage in tests (write a v0 envelope, assert callback fires) consider promoting `Migrate` to `protected virtual` and unsealing the class — that's a deliberate v1 limitation, not an accidental one. See "Known Limitations" below.
+
+**Reset-on-decrypt-fail.** Decryption failure (HMAC mismatch, corrupt ciphertext) does NOT throw. The service logs and resets the in-memory `_data` to empty so the next launch gets a fresh save. For games where progress is monetised, replace `EncryptedJsonSaveService` entirely with an impl that fails loudly and blocks launch until a server-side recovery flow runs — `ISaveService` lives in `Zero.Core` precisely so consumers can swap impls without touching call sites.
 
 ## Examples
 
@@ -96,6 +100,7 @@ _save.OnLoaded.Subscribe(_ =>
 - **Client-side crypto:** HMAC protects against casual tampering (modifying values in a hex editor). It does NOT protect against reverse-engineering the secret or replaying old saves. If progress or currency is tied to real-world money, **you must validate on the backend** (server-of-truth).
 - **No compression:** JSON is stored plaintext → ciphertext, uncompressed. Large save files (>1MB) will be slow to encrypt; consider archiving non-essential data.
 - **Synchronous access:** `TryGet` / `Set` / `Delete` are synchronous; they lock a mutex internally. For very frequent updates (10000+/frame), batch writes in a temporary dict and call `Set` once per frame instead.
+- **Migration testing.** v1's `Migrate` is `private static` and the class is `sealed`, so the EditMode test suite cannot write a synthetic v0 file and assert the callback fires end-to-end. The shipped tests cover round-trip and tamper-reset only. Promoting `Migrate` to `protected virtual` (or refactoring it behind an injected `ISaveMigrator` interface) is a candidate refactor when a real game adds its first migration.
 
 ## Design Rationale
 

@@ -9,16 +9,18 @@
 ```csharp
 public interface IL10nService
 {
+    // The locale is identified by its raw string code (e.g. "en", "vi", "ja-JP")
+    // — Zero.Core deliberately does NOT depend on UnityEngine.Localization.
     string Get(string key, params object[] args);
-    Observable<Locale> OnLocaleChanged { get; }
-    UniTask SetLocaleAsync(LocaleIdentifier locale, CancellationToken ct);
-    Locale CurrentLocale { get; }
+    Observable<string> OnLocaleChanged { get; }
+    UniTask SetLocaleAsync(string locale, CancellationToken ct = default);
+    string CurrentLocale { get; }
 }
 
-// Real implementation in Zero.Services.Localization
-public sealed class UnityLocalizationService : IL10nService { ... }
+// Real implementation in Zero.Services.Localization (wraps com.unity.localization).
+public sealed class UnityLocalizationService : IL10nService, IDisposable { ... }
 
-// Mock for EditMode tests (dictionary-backed)
+// Mock for EditMode tests (dictionary-backed).
 public sealed class MockLocalizationService : IL10nService { ... }
 ```
 
@@ -53,22 +55,22 @@ public sealed class LocaleSelector : MonoBehaviour
 {
     [Inject] private IL10nService _loc;
     private IDisposable _subscription;
-    
+
     private void OnEnable()
     {
-        _subscription = _loc.OnLocaleChanged.Subscribe(newLocale =>
+        _subscription = _loc.OnLocaleChanged.Subscribe(newCode =>
         {
-            Debug.Log($"Switched to {newLocale.LocaleName}");
-            // Re-render all UI text
+            Debug.Log($"Switched to {newCode}");
+            // Re-render all UI text bound to keys.
         });
     }
-    
+
     private void OnDisable() => _subscription?.Dispose();
-    
-    public async UniTask SetLocaleAsync(string localeCode, CancellationToken ct)
+
+    public async UniTask ChangeLanguageAsync(string localeCode, CancellationToken ct)
     {
-        var locale = Locale.CreateLocale(new LocaleIdentifier(localeCode));
-        await _loc.SetLocaleAsync(locale, ct);
+        // Pass the raw string code; the implementation translates to LocaleIdentifier.
+        await _loc.SetLocaleAsync(localeCode, ct);
     }
 }
 ```

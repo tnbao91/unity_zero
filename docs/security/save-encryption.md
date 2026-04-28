@@ -46,32 +46,36 @@ The `EncryptedJsonSaveService` protects user progress from casual tampering usin
 
 On load failure (HMAC mismatch, ciphertext invalid), the service **does not throw**; instead, it logs the error and resets `_data` to empty. This is a recoverable state for single-slot games (player loses progress, but can restart cleanly).
 
-## Key Rotation and Migration
+## Key Rotation vs Schema Migration
 
-**Scenario:** your game shipped with seed "MyGame.v1", but you want to rotate keys to "MyGame.v2" (e.g., due to key compromise, or seasonal key refresh).
+These are two different things and the template handles them differently.
 
-**Process:**
-1. Increase the save version in `EncryptedJsonSaveService` (e.g., from 1 to 2).
-2. Update `ZeroSecrets.asset` with the new seeds.
-3. Implement `Migrate(JObject data, int from, int to)` to handle both `from=1,to=2` and `from=1,to=1` (no-op):
-   ```csharp
-   private static JObject Migrate(JObject data, int from, int to)
-   {
-       // If migrating from old seeds to new seeds, re-encrypt on next save.
-       // No structural change needed; the JSON data is the same.
-       // The new seeds are already in ZeroSecrets, so the next SaveAsync() uses them.
-       return data;
-   }
-   ```
-4. On the first load with new seeds, decryption fails with old seeds (HMAC mismatch) and resets. The player relaunches with empty progress.
+**Schema migration** changes the *shape* of the JSON `data` payload (rename a key, split a value into two, drop an obsolete field). Bump `CurrentVersion` in `EncryptedJsonSaveService` and add a branch in the `Migrate(JObject, from, to)` method:
 
-**Better migration strategy for live games:** don't rotate seeds mid-life. If you must, offer a "migrate save" option that decrypts with old seed, applies Migrate, and re-encrypts with new seed — but this requires keeping both seeds in the binary (or fetching new seeds from a server) during a transition period.
+```csharp
+private static JObject Migrate(JObject data, int from, int to)
+{
+    if (from == 0 && to >= 1)
+    {
+        if (data["player_level"] != null)
+        {
+            data["level"] = data["player_level"];
+            data.Remove("player_level");
+        }
+    }
+    return data;
+}
+```
+
+`Migrate` runs *after* successful decryption, so it does not help with key changes.
+
+**Key rotation** changes the AES/HMAC seeds. There is no in-place rotation in the v1 template: an old save encrypted with old seeds will fail HMAC under new seeds and reset to empty (consumer loses progress). For a live-ops rotation you need to either (a) keep both seed sets in the build, decrypt-with-old → re-encrypt-with-new on first launch, or (b) push a migration build that ships before the rotation. Both require code beyond the v1 surface; design the rotation strategy before shipping.
 
 ## Best Practices
 
 1. **Never hardcode seeds in the shipped binary.** Always load from `ZeroSecrets.asset`.
 2. **Never commit `ZeroSecrets.asset` to the main repo.** Use `.gitignore` and document the setup in your Quick Start.
-3. **For multi-profile saves:** extend `EncryptedJsonSaveService` to manage multiple files (one per slot), each encrypted with the same seeds.
+3. **For multi-profile saves:** `EncryptedJsonSaveService` is `sealed` and writes a single `save.dat`. To support multiple slots, write a sibling impl of `ISaveService` (in `Zero.Services.Save` or your own asmdef) that owns multiple files keyed by slot id, then rebind `ISaveService` in `SaveServiceInstaller`.
 4. **For cloud save:** after saving locally, also send the encrypted bytes to a server. Don't decrypt on the client to re-transmit. Store encrypted blob server-side and re-download on new devices.
 5. **Server validation:** if economy or leaderboards matter, always validate client-reported progression server-side. Log events (level started, level completed, currency earned) and verify they match legitimate play patterns.
 
@@ -83,4 +87,4 @@ On load failure (HMAC mismatch, ciphertext invalid), the service **does not thro
 
 **Why JSON envelope with version?** Plain JSON is human-readable during debugging (when unencrypted in editor logs). The version field future-proofs against format changes without requiring a whole new save file format.
 
-**Why reset on HMAC fail, not throw?** Because in single-slot hybrid casual, a hard fail blocks the game entirely. Resetting to empty is a recoverable fallback. For economies with server validation, implement a custom `IFailLoudHandler` to throw instead and force server recovery on next login.
+**Why reset on HMAC fail, not throw?** In single-slot hybrid casual, a hard fail blocks the game entirely; resetting to empty is a recoverable fallback. For monetised economies the right move is to swap the implementation behind `ISaveService` (in `SaveServiceInstaller`) for one that fails loudly and gates launch on a server-side recovery flow — there is no `IFailLoudHandler` extension point in v1, only the option to replace the binding.

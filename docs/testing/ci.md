@@ -21,36 +21,23 @@ The template ships with a GitHub Actions workflow (`.github/workflows/tests.yml`
 
 **Duration:** typically 10-15 minutes per run (first run without cache; ~3-5 min with cache).
 
-## Setup: UNITY_LICENSE Secret
+## Setup: License Secrets
 
-GitHub Actions runs on shared runners (Ubuntu Linux) without a display. To activate Unity in headless mode, you need a **personal or professional license activation file**.
+GitHub Actions runs on Ubuntu runners without a display, so Unity has to activate headlessly. `game-ci/unity-test-runner@v4` supports both license shapes; the workflow forwards both via `env:` and the action picks the path that has values.
 
-**Steps:**
+**Personal license (free):** set three secrets — `UNITY_EMAIL`, `UNITY_PASSWORD`, `UNITY_SERIAL`. (Personal licenses do not produce a serial via the Hub UI; obtain one from `id.unity.com` if your account qualifies, or use the Pro/Plus path below.) `game-ci` activates with these and re-activates each run.
 
-1. **Get a license:** 
-   - Free Personal edition: download from `unity.com/download`; personal licenses CANNOT be used in CI (no headless activation).
-   - **Professional / Paid edition:** sign in to `account.unity.com`, generate a license activation file.
-   - **Evaluate:** contact Unity sales for a CI evaluation license (free for open-source projects).
-
-2. **Activate on your machine:**
-   - Install Unity 6.0.3.11f1.
-   - Authenticate with your account: `Unity -quit -batchmode -username <email> -password <password> -serial <license>`.
-   - Save the activation file (usually `~/.local/share/Unity/Unity_lic.ulf` on Linux).
-
-3. **Convert to base64:**
+**Professional / Plus license (recommended for CI):**
+1. Run [`game-ci/unity-request-activation-file`](https://game.ci/docs/github/activation) on a one-shot workflow to produce a `Unity_v*.alf` file from your repo's runner.
+2. Sign the `.alf` at `license.unity3d.com` using your Unity account → download the resulting `.ulf` activation file.
+3. Base64-encode the `.ulf` and store it as the `UNITY_LICENSE` repo secret:
    ```bash
-   cat ~/.local/share/Unity/Unity_lic.ulf | base64 > license.txt
-   cat license.txt
+   base64 -w 0 Unity_v6000.x.ulf > license.b64    # Linux
+   base64 -i Unity_v6000.x.ulf -o license.b64     # macOS
    ```
+4. The workflow reads `secrets.UNITY_LICENSE` into `env.UNITY_LICENSE`; the action decodes and activates Unity for every run.
 
-4. **Add to GitHub:**
-   - Go to your repository → Settings → Secrets and variables → Actions.
-   - Click "New repository secret".
-   - Name: `UNITY_LICENSE`
-   - Value: paste the base64-encoded license file content.
-
-5. **Verify in workflow:**
-   The workflow reads `env.UNITY_LICENSE` and passes it to `game-ci/unity-test-runner`, which decodes and activates Unity automatically.
+The workflow's `env:` block exposes both shapes (`UNITY_LICENSE` for Pro/Plus, `UNITY_EMAIL`/`UNITY_PASSWORD`/`UNITY_SERIAL` for Personal). Set whichever set your license uses; leave the others unset.
 
 ## Interpreting Failures
 
@@ -105,11 +92,15 @@ Then rerun the above.
 
 ## Extending CI
 
-**Add PlayMode tests:** create test suites in `Assets/_Project/Scripts/Tests/PlayMode/` and update `.github/workflows/tests.yml`:
+**Add PlayMode tests:** create test suites in `Assets/_Project/Scripts/Tests/PlayMode/` and add a second test-runner step in `.github/workflows/tests.yml`:
 ```yaml
 - uses: game-ci/unity-test-runner@v4
   with:
-    testPlatform: playmode  # Add a separate step for PlayMode
+    projectPath: .
+    unityVersion: 6000.3.11f1
+    testMode: playmode
+    artifactsPath: artifacts-playmode
+    githubToken: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 **Add code coverage:** add a post-step to upload coverage to Codecov:
@@ -135,7 +126,7 @@ Then rerun the above.
 
 **Why EditMode-only in CI?** Because PlayMode tests require rendering, Input System, loaded scenes, and often device-specific code (mobile Input, Notification). These are hard to mock comprehensively. Instead, EditMode tests cover service logic (Save, Pool, EventBus), and PlayMode/device testing is done manually (checklist in Phase 2).
 
-**Why cache Library/?** Compiling the project from scratch takes 5-10 minutes. Caching compiled assemblies (in `Library/metadata` and `Library/ScriptAssemblies`) cuts this to 1-2 minutes. The cache key is a hash of `Library/**`, so a change to code invalidates the cache; dependencies are re-resolved.
+**Why cache Library/?** Compiling the project from scratch takes 5-10 minutes. Caching compiled assemblies (in `Library/metadata` and `Library/ScriptAssemblies`) cuts this to 1-2 minutes. The cache key hashes `Assets/**`, `Packages/**`, and `ProjectSettings/**` — anything that changes the compiled output invalidates the cache. (Hashing `Library/**` itself would not work: `Library/` is gitignored and absent at checkout time, so the hash would be a constant and the cache would never invalidate.)
 
 **Why game-ci/unity-test-runner?** It's the community standard for Unity CI, handles license activation, artifact upload, and result parsing. Rolling your own is error-prone.
 

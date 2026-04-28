@@ -12,7 +12,7 @@ Opensource greenfield Unity 6 LTS template for hybrid casual and puzzle games. M
 
 EditMode tests run on push via GitHub Actions (`.github/workflows/tests.yml`).
 
-**Required:** Set the `UNITY_LICENSE` repository secret per [game-ci docs](https://game.ci/docs/github/getting-started/activation) using a paid/professional Unity license. Forking the template requires a license to activate headless builds; personal editions cannot be used in CI.
+**Required:** activate Unity headlessly by setting either `UNITY_LICENSE` (Pro/Plus, base64-encoded `.ulf`) **or** the trio `UNITY_EMAIL` / `UNITY_PASSWORD` / `UNITY_SERIAL` (Personal). See [game-ci activation docs](https://game.ci/docs/github/activation) and `docs/testing/ci.md` for the step-by-step.
 
 ## Documentation
 
@@ -30,7 +30,7 @@ EditMode tests run on push via GitHub Actions (`.github/workflows/tests.yml`).
 
 ## What's Out of Scope
 
-- Meta layer (wallet, progression, rewards) — consumer-specific; recipes in `docs/meta/recipes.md`.
+- Meta layer (wallet, progression, rewards) — consumer-specific; reference recipes ship in Phase 5 (`docs/meta/recipes.md`).
 - Demo game — template is genre-agnostic.
 - Real SDK implementations (Ads, IAP, Analytics, etc.) — mocks provided; real adapters via extension points.
 

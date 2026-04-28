@@ -13,19 +13,26 @@ jobs:
         with:
           lfs: true
 
+      # Cache Library/ keyed on the inputs that drive its content. Library/
+      # itself is gitignored, so hashing it would produce a constant key and
+      # the cache would never invalidate.
       - uses: actions/cache@v4
         with:
           path: Library
-          key: Library-${{ hashFiles('Library/**') }}
+          key: Library-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
           restore-keys: |
             Library-
 
       - uses: game-ci/unity-test-runner@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
         with:
           projectPath: .
-          testPlatform: editmode
+          unityVersion: 6000.3.11f1
+          testMode: editmode
           artifactsPath: artifacts
           githubToken: ${{ secrets.GITHUB_TOKEN }}
 

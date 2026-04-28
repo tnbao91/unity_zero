@@ -77,15 +77,15 @@ public IEnumerator CancelledOperationThrows() => UniTask.ToCoroutine(async () =>
 
 ## Mocking and Stubs
 
-**Stub for a dependency:**
+**Stub for a dependency** — match the actual `ILogService` shape exactly (`IsEnabled`, `Info`, `Warn`, `Error(string)`, `Error(Exception, string=null)` — there is no `Debug`):
 ```csharp
 private sealed class StubLogService : ILogService
 {
-    public void Debug(string message) { }
+    public bool IsEnabled { get; set; } = true;
     public void Info(string message) { }
     public void Warn(string message) { }
     public void Error(string message) { }
-    public void Error(Exception ex, string message) { }
+    public void Error(Exception exception, string context = null) { }
 }
 
 // Usage in test
@@ -96,12 +96,13 @@ var service = new MyService(new StubLogService());
 ```csharp
 private sealed class SpyLogService : ILogService
 {
+    public bool IsEnabled { get; set; } = true;
     public int ErrorCallCount { get; private set; }
 
+    public void Info(string message) { }
+    public void Warn(string message) { }
     public void Error(string message) => ErrorCallCount++;
-    public void Error(Exception ex, string message) => ErrorCallCount++;
-    
-    // ... other no-op methods
+    public void Error(Exception exception, string context = null) => ErrorCallCount++;
 }
 
 [Test]
@@ -109,9 +110,9 @@ public void ErrorLogged()
 {
     var log = new SpyLogService();
     var service = new MyService(log);
-    
+
     service.TriggerError();
-    
+
     Assert.AreEqual(1, log.ErrorCallCount);
 }
 ```

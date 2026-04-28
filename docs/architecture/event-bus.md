@@ -15,10 +15,11 @@ public interface IEventBus
 }
 
 // Implementation in Zero.Services.Events
-public sealed class R3EventBus : IEventBus
+public sealed class R3EventBus : IEventBus, IDisposable
 {
     public Observable<T> On<T>() { ... }
     public void Publish<T>(T evt) { ... }
+    public void Dispose() { ... }
 }
 ```
 
@@ -32,14 +33,14 @@ public record struct LevelCompletedEvent(int LevelId, int Stars);
 
 // In your UI asmdef (no reference to Gameplay)
 private readonly IEventBus _bus;
-public void Start() 
+public void Start()
 {
     _bus.On<LevelCompletedEvent>()
         .Subscribe(e => ShowVictoryPopup(e.Stars));
 }
 ```
 
-**Bus extension:** the current implementation is a thin `Dictionary<Type, object>` storing `Subject<T>`. To add batching, filtering, or logging, subclass `R3EventBus` and override `On<T>()` or `Publish<T>()`.
+**Replacing the bus.** `R3EventBus` is `sealed` — for batching, filtering, or per-event logging, write a new `IEventBus` impl (e.g. wrapping `R3EventBus` in a decorator) and rebind it in your own `<Game>ScopeInstaller.UserServices.cs` partial. Reflex picks the last registration.
 
 ## Examples
 
@@ -82,9 +83,10 @@ _eventBus.On<LevelCompletedEvent>()
 
 ## Known Limitations
 
-- **Value-type boxing:** `Record struct` events get boxed when stored in the internal `Dictionary<Type, object>` and unboxed on each publish. For very high-frequency events (>1000/s), use R3 streams directly in the publishing service instead of the bus.
-- **No ordering guarantee:** if multiple subscribers exist, their relative call order is undefined. Design events to be idempotent or use a request/response pattern (via UniTask.Future + completion sources) for sequential ordering.
-- **No type hierarchy:** `On<Animal>()` will NOT match `Publish(new Dog())`. Each event type must be subscribed explicitly.
+- **No type hierarchy:** `On<Animal>()` will NOT match `Publish(new Dog())`. Each event type must be subscribed explicitly. The bus is keyed by `typeof(T)`, not by assignability.
+- **No ordering guarantee:** when multiple subscribers exist on the same type, their relative call order is the order R3's `Subject<T>` happens to iterate its observers. Treat it as undefined and design events to be idempotent.
+- **Lock granularity:** the dictionary access is guarded by a single `lock` (the dictionary itself); each `Publish` and `On` takes that lock briefly. The actual `Subject<T>.OnNext` runs outside the lock so subscribers can re-enter, but extremely high publish rates from many threads will contend on it. Hybrid casual rates (<1000 events/s) are nowhere near that ceiling.
+- **No replay for late subscribers:** the bus stores `Subject<T>`, not `BehaviorSubject<T>` or `ReplaySubject<T>`. A subscriber added after a publish gets nothing; subscribe before the first publish or use a ReactiveProperty inside the publishing service if you need last-value semantics.
 
 ## Design Rationale
 
@@ -96,4 +98,4 @@ Why a bus instead of direct service references? Three design reasons:
 
 3. **Hot-swappable logic:** in editor play sessions, you can tear down/rebuild subsystems without cascade unsubscribe code. Each system independently subscribes on startup.
 
-**Why `Dictionary<Type, object>`?** Because event POCOs are user-defined and live in different asmdefs (Gameplay defines `LevelCompleted`, Meta defines `RewardEarned`). A strongly-typed container would require the bus to reference all consuming asmdefs, creating the circular-import problem it solves. The `Type` key + cast-on-access trades a tiny performance cost (one cast per publish) for zero coupling.
+**Why `Dictionary<Type, object>`?** Because event POCOs are user-defined and live in different asmdefs (Gameplay defines `LevelCompleted`, Meta defines `RewardEarned`). A strongly-typed container would require the bus to reference all consuming asmdefs, creating the circular-import problem it solves. The `Type` key + reference cast (`(Subject<T>)slot`) trades one cast per access for zero coupling. The deliberately-avoided alternative — `Dictionary<Type, Subject<object>>` — would have boxed value-type events on every `OnNext` into the slot's `object` parameter. The current shape forwards `T` strongly through `Subject<T>.OnNext(T)`, so a `record struct` event allocates nothing on publish.
