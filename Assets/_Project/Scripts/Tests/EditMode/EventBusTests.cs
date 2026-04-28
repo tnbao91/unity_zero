@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using R3;
@@ -10,121 +9,84 @@ namespace Zero.Tests.EditMode
     [TestFixture]
     public sealed class EventBusTests
     {
-        private IEventBus _bus;
+        private R3EventBus _bus;
 
         [SetUp]
-        public void SetUp()
-        {
-            _bus = new R3EventBus();
-        }
+        public void SetUp() => _bus = new R3EventBus();
+
+        [TearDown]
+        public void TearDown() => _bus?.Dispose();
 
         [Test]
-        public void PublishSubscribe()
+        public void PublishDeliversToSubscriber()
         {
             int received = 0;
-            using var sub = _bus.On<int>().Subscribe(value =>
-            {
-                received = value;
-            });
-
+            using var sub = _bus.On<int>().Subscribe(v => received = v);
             _bus.Publish(42);
-
             Assert.AreEqual(42, received);
         }
 
         [Test]
-        public void MultipleSubscribers()
+        public void MultipleSubscribersAllReceive()
         {
-            var received1 = 0;
-            var received2 = 0;
-            var received3 = 0;
-
-            using var sub1 = _bus.On<int>().Subscribe(v => received1 = v);
-            using var sub2 = _bus.On<int>().Subscribe(v => received2 = v);
-            using var sub3 = _bus.On<int>().Subscribe(v => received3 = v);
-
+            int a = 0, b = 0, c = 0;
+            using var s1 = _bus.On<int>().Subscribe(v => a = v);
+            using var s2 = _bus.On<int>().Subscribe(v => b = v);
+            using var s3 = _bus.On<int>().Subscribe(v => c = v);
             _bus.Publish(99);
-
-            Assert.AreEqual(99, received1);
-            Assert.AreEqual(99, received2);
-            Assert.AreEqual(99, received3);
+            Assert.AreEqual(99, a);
+            Assert.AreEqual(99, b);
+            Assert.AreEqual(99, c);
         }
 
         [Test]
-        public void TypeIsolation()
+        public void TypeIsolatedStreams()
         {
-            var intReceived = false;
-            var stringReceived = false;
+            bool intHit = false;
+            bool stringHit = false;
+            using var sInt = _bus.On<int>().Subscribe(_ => intHit = true);
+            using var sStr = _bus.On<string>().Subscribe(_ => stringHit = true);
 
-            using var intSub = _bus.On<int>().Subscribe(_ => intReceived = true);
-            using var stringSub = _bus.On<string>().Subscribe(_ => stringReceived = true);
-
-            _bus.Publish("hello");
-
-            Assert.IsFalse(intReceived, "Int subscriber should NOT receive string event.");
-            Assert.IsTrue(stringReceived, "String subscriber should receive string event.");
+            _bus.Publish("hi");
+            Assert.IsFalse(intHit, "int subscriber must not see string events.");
+            Assert.IsTrue(stringHit);
         }
 
         [Test]
-        public void Dispose()
+        public void DisposingSubscriptionStopsDelivery()
         {
-            var callCount = 0;
-
-            var subscription = _bus.On<int>().Subscribe(_ => callCount++);
-
+            int count = 0;
+            var sub = _bus.On<int>().Subscribe(_ => count++);
             _bus.Publish(1);
-            Assert.AreEqual(1, callCount);
+            Assert.AreEqual(1, count);
 
-            subscription.Dispose();
-
+            sub.Dispose();
             _bus.Publish(2);
-            Assert.AreEqual(1, callCount, "Disposed subscription should not receive further events.");
+            Assert.AreEqual(1, count, "Disposed subscription must not receive further events.");
         }
 
         [Test]
-        public void RecordEventType()
+        public void ValueTypeEventDelivered()
         {
-            var eventRecords = new List<object>();
-
-            using var sub = _bus.On<EventRecord>().Subscribe(e => eventRecords.Add(e));
-
-            _bus.Publish(new EventRecord { Value = 1 });
-            _bus.Publish(new EventRecord { Value = 2 });
-
-            Assert.AreEqual(2, eventRecords.Count);
-            Assert.AreEqual(1, ((EventRecord)eventRecords[0]).Value);
-            Assert.AreEqual(2, ((EventRecord)eventRecords[1]).Value);
+            var seen = new List<int>();
+            using var sub = _bus.On<TickEvent>().Subscribe(e => seen.Add(e.Frame));
+            _bus.Publish(new TickEvent { Frame = 1 });
+            _bus.Publish(new TickEvent { Frame = 2 });
+            Assert.AreEqual(new[] { 1, 2 }, seen);
         }
 
         [Test]
-        public void StructEventType()
+        public void LateSubscriberDoesNotReplay()
         {
-            var values = new List<int>();
-
-            using var sub = _bus.On<EventStruct>().Subscribe(e => values.Add(e.Value));
-
-            _bus.Publish(new EventStruct { Value = 10 });
-            _bus.Publish(new EventStruct { Value = 20 });
-
-            Assert.AreEqual(2, values.Count);
-            Assert.AreEqual(10, values[0]);
-            Assert.AreEqual(20, values[1]);
+            _bus.Publish(7);
+            int received = -1;
+            using var sub = _bus.On<int>().Subscribe(v => received = v);
+            Assert.AreEqual(-1, received, "R3 Subject is not behavior-replaying; late subscribers see no history.");
         }
 
-        /// <summary>
-        /// Test event as a record type.
-        /// </summary>
-        private sealed class EventRecord
+        private struct TickEvent
         {
-            public int Value { get; set; }
-        }
-
-        /// <summary>
-        /// Test event as a struct type.
-        /// </summary>
-        private struct EventStruct
-        {
-            public int Value { get; set; }
+            public int Frame;
         }
     }
 }

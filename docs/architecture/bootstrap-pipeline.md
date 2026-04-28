@@ -7,26 +7,26 @@ The bootstrap pipeline is a **sequential, resilient startup sequence** that init
 ## Public API
 
 ```csharp
-// In Zero.Infrastructure
+// In Zero.Bootstrap
 public sealed class BootstrapPipeline
 {
     public BootstrapPipeline(
-        IBootstrapStep[] steps,
+        IReadOnlyList<IBootstrapStep> steps,
         ILogService log,
-        IBootstrapProgressReporter progressReporter);
-    
-    public async UniTask RunAsync(CancellationToken ct);
+        IBootstrapProgressReporter reporter);
+
+    public UniTask RunAsync(IProgress<float> overallProgress, CancellationToken ct);
 }
 
 // Base class in Zero.Infrastructure for all steps
 public abstract class BootstrapStepBase : IBootstrapStep
 {
     public abstract string Name { get; }
-    public abstract bool IsCritical { get; }
+    public virtual bool IsCritical => false;
     public virtual TimeSpan Timeout => TimeSpan.FromSeconds(30);
     public virtual int MaxRetries => 1;
-    
-    protected abstract UniTask OnExecuteAsync(CancellationToken ct);
+
+    protected abstract UniTask OnExecuteAsync(IProgress<float> progress, CancellationToken ct);
 }
 
 // Reporting interface in Zero.Core

@@ -1,124 +1,116 @@
 using System;
+using System.Collections;
 using System.IO;
 using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 using Zero.Core;
 using Zero.Services.Save;
 
 namespace Zero.Tests.EditMode
 {
+    // EncryptedJsonSaveService writes to a fixed file (Application.persistentDataPath/save.dat).
+    // Tests therefore run sequentially (NUnit default) and clean up the file in SetUp + TearDown.
     [TestFixture]
     public sealed class SaveServiceTests
     {
-        private string _testSavePath;
-        private EncryptedJsonSaveService _service;
+        private string _saveFile;
 
         [SetUp]
         public void SetUp()
         {
-            // Use a temp file for this test; EncryptedJsonSaveService uses Application.persistentDataPath,
-            // so we just clean up the actual persistent file in teardown to avoid side effects.
-            _testSavePath = Path.Combine(Application.persistentDataPath, "test_save.dat");
-            if (File.Exists(_testSavePath))
-            {
-                File.Delete(_testSavePath);
-            }
-            _service = new EncryptedJsonSaveService(new StubLogService());
+            _saveFile = Path.Combine(Application.persistentDataPath, "save.dat");
+            DeleteSave();
         }
 
         [TearDown]
-        public void TearDown()
+        public void TearDown() => DeleteSave();
+
+        private void DeleteSave()
         {
-            _service?.Dispose();
-            if (File.Exists(_testSavePath))
-            {
-                File.Delete(_testSavePath);
-            }
+            if (File.Exists(_saveFile)) File.Delete(_saveFile);
+            string tmp = _saveFile + ".tmp";
+            if (File.Exists(tmp)) File.Delete(tmp);
         }
 
         [UnityTest]
-        public IEnumerator RoundTrip() => UniTask.ToCoroutine(async () =>
+        public IEnumerator RoundTripPreservesPrimitivesAndNested() => UniTask.ToCoroutine(async () =>
         {
-            await _service.LoadAsync();
+            var writer = new EncryptedJsonSaveService(new StubLogService());
+            await writer.LoadAsync();
 
-            // Set some data.
-            _service.Set("player_name", "Alice");
-            _service.Set("level", 42);
-            var nestedObj = new { currency = 1000, items = new[] { "sword", "shield" } };
-            _service.Set("inventory", nestedObj);
+            writer.Set("name", "Alice");
+            writer.Set("level", 42);
+            writer.Set("flags", new[] { "a", "b", "c" });
+            await writer.SaveAsync();
+            writer.Dispose();
 
-            // Save to disk.
-            await _service.SaveAsync();
+            var reader = new EncryptedJsonSaveService(new StubLogService());
+            await reader.LoadAsync();
 
-            // Create a fresh service instance and load from the same file.
-            var service2 = new EncryptedJsonSaveService(new StubLogService());
-            await service2.LoadAsync();
+            Assert.IsTrue(reader.TryGet("name", out string name));
+            Assert.AreEqual("Alice", name);
 
-            // Verify round-trip.
-            Assert.IsTrue(service2.TryGet("player_name", out string name) && name == "Alice");
-            Assert.IsTrue(service2.TryGet("level", out int level) && level == 42);
-            Assert.IsTrue(service2.TryGet("inventory", out dynamic inventory));
-            Assert.AreEqual(1000, inventory.currency.Value);
-            Assert.AreEqual("sword", inventory.items[0].Value);
+            Assert.IsTrue(reader.TryGet("level", out int level));
+            Assert.AreEqual(42, level);
 
-            service2.Dispose();
+            Assert.IsTrue(reader.TryGet("flags", out string[] flags));
+            Assert.AreEqual(new[] { "a", "b", "c" }, flags);
+
+            reader.Dispose();
         });
 
         [UnityTest]
-        public IEnumerator TamperDetection() => UniTask.ToCoroutine(async () =>
+        public IEnumerator TamperedFileResetsToEmpty() => UniTask.ToCoroutine(async () =>
         {
-            await _service.LoadAsync();
+            var writer = new EncryptedJsonSaveService(new StubLogService());
+            await writer.LoadAsync();
+            writer.Set("treasure", 9999);
+            await writer.SaveAsync();
+            writer.Dispose();
 
-            _service.Set("important_data", 9999);
-            await _service.SaveAsync();
+            byte[] bytes = File.ReadAllBytes(_saveFile);
+            Assert.Greater(bytes.Length, 64, "Save file must include HMAC + IV + ciphertext.");
+            // Flip a byte well into the ciphertext (past the 32-byte HMAC and 16-byte IV).
+            bytes[60] ^= 0xFF;
+            File.WriteAllBytes(_saveFile, bytes);
 
-            // Tamper with the saved file (flip a byte in the middle, past the HMAC and IV).
-            string filePath = Path.Combine(Application.persistentDataPath, "save.dat");
-            byte[] data = File.ReadAllBytes(filePath);
-            Assert.Greater(data.Length, 64);
-            data[50] ^= 0xFF; // Flip bits in the middle.
-            File.WriteAllBytes(filePath, data);
-
-            // Load from the tampered file. Should NOT throw, but should reset to empty (per contract).
-            var service2 = new EncryptedJsonSaveService(new StubLogService());
-            await service2.LoadAsync();
-
-            // The tampered data should fail HMAC and reset to empty.
-            Assert.IsFalse(service2.TryGet("important_data", out _), "Tampered file should have been reset.");
-
-            service2.Dispose();
+            var reader = new EncryptedJsonSaveService(new StubLogService());
+            // Must not throw — service contract is reset-to-empty on decrypt failure.
+            await reader.LoadAsync();
+            Assert.IsFalse(reader.TryGet("treasure", out int _),
+                "HMAC mismatch should reset to empty; previously-set keys must be unreachable.");
+            reader.Dispose();
         });
 
         [UnityTest]
-        public IEnumerator MigrationWhenLoading() => UniTask.ToCoroutine(async () =>
+        public IEnumerator ReloadingExistingFileMergesData() => UniTask.ToCoroutine(async () =>
         {
-            // This test verifies that loading a file and triggering migration works.
-            // For a full migration test, we'd need to synthesize a v0 file, which requires
-            // duplicating the encryption logic. Instead, we verify the happy path: load a v1 file,
-            // ensure no error.
-            await _service.LoadAsync();
-            _service.Set("test_key", "test_value");
-            await _service.SaveAsync();
+            // Smoke test for the load → save → reload path. Full migration coverage
+            // (writing a synthetic v0 envelope, asserting Migrate(...) ran) requires
+            // the service's Migrate hook to be exposed for testing — tracked as a
+            // future refactor; see docs/services/save.md "Known Limitations".
+            var first = new EncryptedJsonSaveService(new StubLogService());
+            await first.LoadAsync();
+            first.Set("k", "v");
+            await first.SaveAsync();
+            first.Dispose();
 
-            var service2 = new EncryptedJsonSaveService(new StubLogService());
-            // This call should succeed; if migration code breaks, it would throw here.
-            await service2.LoadAsync();
-            Assert.IsTrue(service2.TryGet("test_key", out string val) && val == "test_value");
-
-            service2.Dispose();
+            var second = new EncryptedJsonSaveService(new StubLogService());
+            await second.LoadAsync();
+            Assert.IsTrue(second.TryGet("k", out string v));
+            Assert.AreEqual("v", v);
+            second.Dispose();
         });
 
-        /// <summary>
-        /// Stub ILogService for testing. Implements all methods as no-ops.
-        /// </summary>
         private sealed class StubLogService : ILogService
         {
-            public void Debug(string message) { }
+            public bool IsEnabled { get; set; } = true;
             public void Info(string message) { }
             public void Warn(string message) { }
             public void Error(string message) { }
-            public void Error(Exception ex, string message) { }
+            public void Error(Exception exception, string context = null) { }
         }
     }
 }

@@ -1,7 +1,9 @@
 using System;
+using System.Collections;
 using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 using Zero.Core;
 using Zero.Services.Pool;
 
@@ -10,127 +12,94 @@ namespace Zero.Tests.EditMode
     [TestFixture]
     public sealed class PoolServiceTests
     {
-        private IPoolService _poolService;
-        private StubLogService _logService;
+        private UnityPoolService _service;
+        private GameObject _prefab;
 
         [SetUp]
         public void SetUp()
         {
-            _logService = new StubLogService();
-            _poolService = new UnityPoolService(_logService);
+            _service = new UnityPoolService(new StubLogService());
+            _prefab = new GameObject("TestPrefab");
+            _prefab.SetActive(true);
         }
 
         [TearDown]
         public void TearDown()
         {
-            (_poolService as UnityPoolService)?.Dispose();
+            _service?.Dispose();
+            if (_prefab != null) UnityEngine.Object.DestroyImmediate(_prefab);
         }
 
         [Test]
-        public void GetReleaseOrdering()
+        public void GetReleaseLifoOrdering()
         {
-            var pool = _poolService.GetPool<GameObject>();
+            var pool = _service.GetPool(_prefab);
+            var a = pool.Spawn();
+            var b = pool.Spawn();
+            var c = pool.Spawn();
+            Assert.AreEqual(3, pool.Active);
 
-            // Spawn 3 objects.
-            var obj1 = pool.Get();
-            var obj2 = pool.Get();
-            var obj3 = pool.Get();
+            pool.Despawn(b);
+            Assert.AreEqual(2, pool.Active);
+            Assert.AreEqual(1, pool.Inactive);
 
-            // Release the middle one.
-            pool.Release(obj2);
+            // Next spawn should reuse `b` (LIFO from UnityEngine.Pool.ObjectPool's Stack).
+            var d = pool.Spawn();
+            Assert.AreSame(b, d, "Pool should reuse the most recently released instance.");
+        }
 
-            // Spawn another — should reuse obj2 (LIFO).
-            var obj4 = pool.Get();
-            Assert.AreSame(obj2, obj4, "Pool should reuse the most recently released object (LIFO).");
+        [UnityTest]
+        public IEnumerator PrewarmFillsInactive() => UniTask.ToCoroutine(async () =>
+        {
+            await _service.PrewarmAsync(_prefab, 5);
 
-            // Cleanup.
-            pool.Release(obj1);
-            pool.Release(obj3);
-            pool.Release(obj4);
+            var pool = _service.GetPool(_prefab);
+            Assert.AreEqual(0, pool.Active, "Prewarm must not leak Active count.");
+            Assert.AreEqual(5, pool.Inactive, "Prewarm should populate Inactive with N instances.");
+        });
+
+        [Test]
+        public void SpawnedObjectIsActiveDespawnedIsInactive()
+        {
+            var pool = _service.GetPool(_prefab);
+            var go = pool.Spawn(new Vector3(1, 2, 3), Quaternion.identity);
+            Assert.IsTrue(go.activeSelf, "Spawned GameObject must be active.");
+            Assert.AreEqual(new Vector3(1, 2, 3), go.transform.position);
+
+            pool.Despawn(go);
+            Assert.IsFalse(go.activeSelf, "Despawned GameObject must be inactive.");
         }
 
         [Test]
-        public void PrewarmCount()
+        public void DistinctSpawnsReturnDistinctInstances()
         {
-            var pool = _poolService.GetPool<GameObject>();
-
-            // After initialization, the pool should have no inactive objects yet (lazy init).
-            // Prewarm should create N objects and keep them inactive.
-            const int prewarmSize = 5;
-            for (int i = 0; i < prewarmSize; i++)
-            {
-                pool.Release(pool.Get());
-            }
-
-            // Spawn one more — it should reuse a prewarmed object.
-            var spawned = pool.Get();
-            Assert.IsNotNull(spawned);
-
-            // Cleanup.
-            pool.Release(spawned);
+            var pool = _service.GetPool(_prefab);
+            var a = pool.Spawn();
+            var b = pool.Spawn();
+            var c = pool.Spawn();
+            Assert.AreNotSame(a, b);
+            Assert.AreNotSame(b, c);
+            Assert.AreNotSame(a, c);
         }
 
         [Test]
-        public void DisposeCleanup()
+        public void DisposeIsIdempotent()
         {
-            var pool = _poolService.GetPool<GameObject>();
+            var pool = _service.GetPool(_prefab);
+            var go = pool.Spawn();
+            pool.Despawn(go);
 
-            // Spawn and release an object.
-            var obj = pool.Get();
-            var poolRoot = obj.transform.parent?.gameObject;
-            pool.Release(obj);
-
-            // Dispose the pool service.
-            (_poolService as UnityPoolService).Dispose();
-
-            // The pool root should be cleaned up (destroyed).
-            // After dispose, the pool should be empty; trying to get should fail or return null.
-            // Since we can't interact with the pool after dispose, we just verify cleanup happened.
-            Assert.Pass("Pool disposed without error.");
+            Assert.DoesNotThrow(() => _service.Dispose());
+            Assert.DoesNotThrow(() => _service.Dispose());
         }
 
-        [Test]
-        public void MultipleSpawnsReturnNewObjects()
-        {
-            var pool = _poolService.GetPool<GameObject>();
-
-            var obj1 = pool.Get();
-            var obj2 = pool.Get();
-            var obj3 = pool.Get();
-
-            // All should be distinct.
-            Assert.AreNotSame(obj1, obj2);
-            Assert.AreNotSame(obj2, obj3);
-            Assert.AreNotSame(obj1, obj3);
-
-            // Cleanup.
-            pool.Release(obj1);
-            pool.Release(obj2);
-            pool.Release(obj3);
-        }
-
-        [Test]
-        public void PooledObjectsAreActive()
-        {
-            var pool = _poolService.GetPool<GameObject>();
-
-            var obj = pool.Get();
-            Assert.IsTrue(obj.activeSelf, "Spawned objects should be active.");
-
-            pool.Release(obj);
-            Assert.IsFalse(obj.activeSelf, "Released objects should be inactive.");
-        }
-
-        /// <summary>
-        /// Stub ILogService for testing.
-        /// </summary>
         private sealed class StubLogService : ILogService
         {
-            public void Debug(string message) { }
+            public bool IsEnabled { get; set; } = true;
             public void Info(string message) { }
             public void Warn(string message) { }
             public void Error(string message) { }
-            public void Error(Exception ex, string message) { }
+            public void Error(Exception exception, string context = null) { }
         }
     }
 }

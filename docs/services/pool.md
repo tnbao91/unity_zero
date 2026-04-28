@@ -2,117 +2,78 @@
 
 ## Overview
 
-`IPoolService` provides reusable `ObjectPool<T>` instances for managing spawned GameObjects. The implementation `UnityPoolService` wraps `UnityEngine.Pool.ObjectPool<GameObject>` (built-in since Unity 2021+), using callbacks to automatically `SetActive(true)` on spawn and `SetActive(false)` on release. Pooled objects are parented under a `[Zero.Pools]` root to keep the hierarchy clean.
+`IPoolService` provides per-prefab `IPool<T>` instances for spawning and despawning Unity `GameObject`s and component subclasses. The implementation `UnityPoolService` wraps `UnityEngine.Pool.ObjectPool<GameObject>` (built-in since Unity 2021), so allocations stay bounded and `collectionCheck` catches double-release in the Editor. Released instances are reparented under a `[Zero.Pools]` `DontDestroyOnLoad` root to keep scenes clean.
 
 ## Public API
 
 ```csharp
-public interface IPoolService
+namespace Zero.Core
 {
-    IObjectPool<T> GetPool<T>() where T : class;
-}
-
-// Usage via the built-in interface
-public interface IObjectPool<T>
-{
-    T Get();
-    void Release(T element);
-}
-
-// Implementation in Zero.Services.Pool
-public sealed class UnityPoolService : IPoolService, IDisposable
-{
-    public const int DefaultCapacity = 10;
-    public const int MaxSize = 10000;
-}
-```
-
-## Extension Points
-
-**Component pools:** while the interface is generic, the implementation specializes in `GameObject`. To pool `AudioSource` or `ParticleSystem` components, create a GameObject prefab with that component and pool the GameObject:
-
-```csharp
-// Instead of IPoolService.GetPool<AudioSource>():
-var prefab = Resources.Load<GameObject>("Prefabs/AudioSourceGO");
-var pool = _poolService.GetPool<GameObject>();
-var audioSourceGO = pool.Get();
-var audioSource = audioSourceGO.GetComponent<AudioSource>();
-```
-
-**Custom pool parameters:** if you need different capacity/maxSize per pool type, extend `UnityPoolService` and override `GetPool<T>()` to apply custom settings:
-
-```csharp
-public sealed class CustomPoolService : UnityPoolService
-{
-    public override IObjectPool<T> GetPool<T>()
+    public interface IPool<T> where T : UnityEngine.Object
     {
-        var pool = base.GetPool<T>();
-        // Customize capacity, maxSize, etc. via reflection if needed
-        return pool;
+        int Active { get; }
+        int Inactive { get; }
+        T Spawn();
+        T Spawn(Vector3 position, Quaternion rotation);
+        void Despawn(T instance);
+    }
+
+    public interface IPoolService
+    {
+        UniTask PrewarmAsync<T>(T prefab, int count, CancellationToken ct = default)
+            where T : UnityEngine.Object;
+        IPool<T> GetPool<T>(T prefab) where T : UnityEngine.Object;
+        void Clear<T>(T prefab) where T : UnityEngine.Object;
     }
 }
 ```
 
+`Spawn` activates the instance after parenting + positioning (so `OnEnable` sees the requested transform). `Despawn` deactivates and reparents to the pool root.
+
+## Extension Points
+
+- **Component pools:** call `GetPool<MyComponent>(prefab)` where `prefab` is a `GameObject` *or* the component itself; the inner `ComponentPool<T>` wraps the GameObject pool and resolves the component on each spawn.
+- **Custom defaults:** the `UnityEngine.Pool.ObjectPool<GameObject>` is created in `UnityPoolService.GameObjectPool` with `defaultCapacity: 10`, `maxSize: 10000`, and Editor-only `collectionCheck`. Per-game tuning means swapping the binding in `PoolServiceInstaller` for a subclass that overrides those constants.
+- **Replace entirely:** rebind `IPoolService` to a different impl in your own `<Game>ScopeInstaller.UserServices.cs` partial — Reflex picks the last registration.
+
 ## Examples
 
-**Spawn and release bullets:**
 ```csharp
-[Inject] private IPoolService _pool;
-private IObjectPool<GameObject> _bulletPool;
-
-private void Start()
+public sealed class BulletSpawner : MonoBehaviour
 {
-    _bulletPool = _pool.GetPool<GameObject>();
-}
+    [Inject] private IPoolService _pools;
+    [SerializeField] private GameObject _bulletPrefab;
+    private IPool<GameObject> _pool;
 
-private void FireBullet(Vector3 position, Vector3 direction)
-{
-    var bullet = _bulletPool.Get();
-    bullet.transform.position = position;
-    bullet.GetComponent<Rigidbody>().velocity = direction * 10f;
-}
+    private void Awake() => _pool = _pools.GetPool(_bulletPrefab);
 
-public void OnBulletHit(GameObject bullet)
-{
-    bullet.GetComponent<Rigidbody>().velocity = Vector3.zero;
-    _bulletPool.Release(bullet);
+    public void Fire(Vector3 origin, Quaternion aim)
+    {
+        var bullet = _pool.Spawn(origin, aim);
+        // ...physics setup...
+    }
+
+    public void OnBulletExpired(GameObject bullet) => _pool.Despawn(bullet);
 }
 ```
 
-**VFX particle effects (fire-and-forget):**
-```csharp
-private IObjectPool<GameObject> _explosionPool;
+Prewarm at scene load to avoid first-shot hitches:
 
-private async UniTask ShowExplosion(Vector3 pos, CancellationToken ct)
-{
-    var vfx = _explosionPool.Get();
-    vfx.transform.position = pos;
-    var ps = vfx.GetComponent<ParticleSystem>();
-    ps.Play();
-    
-    // Wait for particle duration
-    await UniTask.Delay((int)(ps.main.duration * 1000), cancellationToken: ct);
-    _explosionPool.Release(vfx);
-}
+```csharp
+await _pools.PrewarmAsync(_bulletPrefab, count: 32, ct);
 ```
 
 ## Known Limitations
 
-- **No automatic release on destroy:** if you destroy a pooled object while released (e.g., via `Object.Destroy(go)` instead of pool.Release), the pool thinks it's still available and may return a destroyed reference on next `Get()`. Always release via the pool, not via `Destroy()`.
-- **No cross-frame object reuse hints:** if you spawn 100 bullets per frame but only need 10, the pool will grow to 100. Periodic pruning (shrink the pool when not in use) is not implemented; if memory bloat is a concern, call `GetPool<T>().Clear()` manually or recreate the pool.
-- **No priority/FIFO ordering:** `ObjectPool<T>` uses LIFO (last-out-first-in, stack-based), so the most recently released object is reused first. If you need FIFO ordering or prioritization, wrap the pool with a custom scheduler.
+- **`Despawn` of a `Destroy`d object is undefined.** Always despawn through the pool; never `Object.Destroy(...)` a pooled instance, or the pool will hand a destroyed reference back on the next `Spawn`.
+- **No automatic shrink.** Pools grow up to `maxSize` and stay there. If a level burst-spawns 500 instances and the next level uses 5, you keep the high-water memory until you `Clear(prefab)` or dispose the service.
+- **LIFO reuse.** `Spawn` returns the most recently `Despawn`ed instance first (stack semantics from `UnityEngine.Pool.ObjectPool`). If you depend on FIFO, wrap the pool yourself.
+- **No thread safety.** All pool ops must happen on the Unity main thread.
 
 ## Design Rationale
 
-**Why `UnityEngine.Pool.ObjectPool` instead of a hand-rolled `Stack<T>`?** Because the built-in class includes `collectionCheck` (editor-only warnings for double-release), `maxSize` bounds (prevents unbounded growth), and standardized `actionOnGet`/`actionOnRelease`/`actionOnDestroy` callbacks. This is battle-tested infrastructure, and custom pooling is a common footgun.
+The original `ReflexPoolService` (renamed to `UnityPoolService` in Phase 1a) hand-rolled a `Stack<GameObject>` for inactive storage. That predated `UnityEngine.Pool.ObjectPool`, which now offers the same primitives plus `collectionCheck`, `maxSize`, and matured callback hooks. Switching dropped ~30 lines of bespoke code and gave us double-release detection in the Editor for free.
 
-**Callbacks for SetActive:**
-- `actionOnGet`: called when `Get()` is invoked. We use this to `SetActive(true)` + reset transform.
-- `actionOnRelease`: called when `Release()` is invoked. We use this to `SetActive(false)` + reparent to `[Zero.Pools]`.
-- `actionOnDestroy`: called when the pool is disposed or an object exceeds maxSize. We use this to `Object.Destroy()`.
+`actionOnGet` is deliberately left **null**: activation happens in `Spawn(...)` *after* the instance is reparented and positioned, so `OnEnable` callbacks see the requested transform. The earlier ordering — `SetActive(true)` inside `actionOnGet` — caused `OnEnable` to fire while the object was still parked at the pool root with stale position. Fixed in commit `c0ee281`.
 
-This design ensures spawned objects are active and at the requested position/rotation, without manual setup every time.
-
-**Per-pool root:** all released (inactive) objects are reparented under `[Zero.Pools]` so the scene hierarchy doesn't get cluttered with inactive game objects. When spawned again, they're reparented to their game destination.
-
-**Defaults:** `DefaultCapacity = 10` (initial pool size) and `MaxSize = 10000` (hard cap to prevent memory bloat). For most games, these are safe. Per-pool tuning is possible via subclassing if needed.
+`createFunc` instantiates each new GameObject parented to `[Zero.Pools]` and immediately `SetActive(false)`, so freshly-created instances never flash active in the wrong place between create-and-first-Spawn.
