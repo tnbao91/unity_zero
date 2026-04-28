@@ -12,7 +12,6 @@
         "Zero.Services.Log",
         "Zero.Bootstrap",
         "UniTask",
-        "R3",
         "Reflex"
     ],
     "includePlatforms": [
@@ -22,7 +21,8 @@
     "allowUnsafeCode": false,
     "overrideReferences": true,
     "precompiledReferences": [
-        "nunit.framework.dll"
+        "nunit.framework.dll",
+        "R3.dll"
     ],
     "autoReferenced": false,
     "defineConstraints": [
