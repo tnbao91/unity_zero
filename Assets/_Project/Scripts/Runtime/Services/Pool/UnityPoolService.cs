@@ -90,7 +90,14 @@ namespace Zero.Services.Pool
         {
             if (_root != null) return;
             var go = new GameObject("[Zero.Pools]");
-            Object.DontDestroyOnLoad(go);
+            // DontDestroyOnLoad throws InvalidOperationException in EditMode
+            // (Editor scripts and EditMode tests). At runtime the pool root
+            // must survive scene loads; in the Editor we just leave it parented
+            // to the active scene — good enough for tests and tooling.
+            if (Application.isPlaying)
+            {
+                Object.DontDestroyOnLoad(go);
+            }
             go.SetActive(true);
             _root = go.transform;
         }
