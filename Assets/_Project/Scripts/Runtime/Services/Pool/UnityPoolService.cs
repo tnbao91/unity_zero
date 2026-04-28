@@ -3,19 +3,20 @@ using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Pool;
 using Zero.Core;
 using Object = UnityEngine.Object;
 
 namespace Zero.Services.Pool
 {
-    public sealed class ReflexPoolService : IPoolService, IDisposable
+    public sealed class UnityPoolService : IPoolService, IDisposable
     {
         private readonly ILogService _log;
         private readonly Dictionary<int, IPoolHandle> _pools = new();
         private Transform _root;
         private bool _disposed;
 
-        public ReflexPoolService(ILogService log)
+        public UnityPoolService(ILogService log)
         {
             _log = log;
         }
@@ -101,62 +102,82 @@ namespace Zero.Services.Pool
             private readonly GameObject _prefab;
             private readonly Transform _root;
             private readonly ILogService _log;
-            private readonly Stack<GameObject> _inactive = new();
-            private int _active;
+            private ObjectPool<GameObject> _pool;
 
-            public int Active => _active;
-            public int Inactive => _inactive.Count;
+            public int Active => _pool.CountActive;
+            public int Inactive => _pool.CountInactive;
 
             public GameObjectPool(GameObject prefab, Transform root, ILogService log)
             {
                 _prefab = prefab;
                 _root = root;
                 _log = log;
+
+                // Create UnityEngine.Pool.ObjectPool with appropriate actions
+#if UNITY_EDITOR
+                const bool collectionCheck = true;
+#else
+                const bool collectionCheck = false;
+#endif
+                _pool = new ObjectPool<GameObject>(
+                    createFunc: CreateGameObject,
+                    actionOnGet: OnGet,
+                    actionOnRelease: OnRelease,
+                    actionOnDestroy: OnDestroy,
+                    collectionCheck: collectionCheck,
+                    defaultCapacity: 10,
+                    maxSize: 10000
+                );
+            }
+
+            private GameObject CreateGameObject()
+            {
+                return Object.Instantiate(_prefab);
+            }
+
+            private void OnGet(GameObject go)
+            {
+                go.SetActive(true);
+            }
+
+            private void OnRelease(GameObject go)
+            {
+                go.SetActive(false);
+                go.transform.SetParent(_root, false);
+            }
+
+            private void OnDestroy(GameObject go)
+            {
+                Object.Destroy(go);
             }
 
             public GameObject Spawn() => Spawn(Vector3.zero, Quaternion.identity);
 
             public GameObject Spawn(Vector3 position, Quaternion rotation)
             {
-                GameObject inst;
-                if (_inactive.Count > 0)
-                {
-                    inst = _inactive.Pop();
-                    inst.transform.SetParent(null, false);
-                    inst.transform.SetPositionAndRotation(position, rotation);
-                    inst.SetActive(true);
-                }
-                else
-                {
-                    inst = Object.Instantiate(_prefab, position, rotation);
-                }
-                _active++;
+                var inst = _pool.Get();
+                inst.transform.SetParent(null, false);
+                inst.transform.SetPositionAndRotation(position, rotation);
                 return inst;
             }
 
             public void Despawn(GameObject instance)
             {
                 if (instance == null) return;
-                instance.SetActive(false);
-                instance.transform.SetParent(_root, false);
-                _inactive.Push(instance);
-                if (_active > 0) _active--;
+                _pool.Release(instance);
             }
 
             internal void Prewarm()
             {
-                var inst = Object.Instantiate(_prefab, _root);
-                inst.SetActive(false);
-                _inactive.Push(inst);
+                var inst = _pool.Get();
+                _pool.Release(inst);
             }
 
             public void Dispose()
             {
-                while (_inactive.Count > 0)
-                {
-                    var go = _inactive.Pop();
-                    if (go != null) Object.Destroy(go);
-                }
+                _pool?.Clear();
+                _pool?.Dispose();
+                _pool = null;
             }
         }
 
