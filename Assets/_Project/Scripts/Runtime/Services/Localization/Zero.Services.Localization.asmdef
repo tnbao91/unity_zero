@@ -1,14 +1,16 @@
 {
-    "name": "Zero.Gameplay",
-    "rootNamespace": "Zero.Gameplay",
+    "name": "Zero.Services.Localization",
+    "rootNamespace": "Zero.Services.Localization",
     "references": [
         "Zero.Core",
         "Zero.Infrastructure",
-        "Zero.Services.Events",
         "UniTask",
+        "UniTask.Addressables",
         "R3",
         "Reflex",
-        "LitMotion"
+        "Unity.Localization",
+        "Unity.Addressables",
+        "Unity.ResourceManager"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

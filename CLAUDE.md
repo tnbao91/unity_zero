@@ -19,20 +19,21 @@ Packages come from OpenUPM (Cysharp/AnnulusGames/Reflex) plus Unity registry. Nu
 
 ## Architecture
 
-The codebase is split into ~22 assembly definitions enforcing a strict dependency direction:
+The codebase is split into ~24 assembly definitions enforcing a strict dependency direction. **Gameplay/Meta/UI are peers** — they never reference each other; they cross-talk only through `IEventBus` (Phase 1a, see `docs/dev/PLAN.md` §2.1).
 
 ```
-Zero.Core (interfaces only, references UniTask + R3)
+Zero.Core (interfaces, POCOs, cross-cutting events; references UniTask + R3)
    ↑
-Zero.Infrastructure (BootstrapStepBase + shared base classes)
+Zero.Infrastructure (BootstrapStepBase + BootstrapProgressReporter)
    ↑
-Zero.Services.<Name> (one asmdef per service, owns its installer)
-   ↑
-Zero.Bootstrap (composition root, references every service)
-Zero.Meta / Zero.UI / Zero.Gameplay (game logic — depend on Core + Infrastructure)
+Zero.Services.<Name>  (one asmdef per service; includes Zero.Services.Events, Zero.Services.Localization)
+   ↑          ↑          ↑
+Zero.UI   Zero.Meta   Zero.Gameplay   ← peers, talk via IEventBus
+        ↘     ↓     ↙
+      Zero.Bootstrap (composition root, references every service + every peer)
 ```
 
-`Zero.Core` only holds interfaces (`I*Service`) and POCOs. Services never reference each other directly — they cross-talk through interfaces resolved from the Reflex container.
+`Zero.Core` only holds interfaces (`I*Service`) and POCOs. Services never reference each other directly — they cross-talk through interfaces resolved from the Reflex container. Cross-asmdef domain events go through `IEventBus` (impl `R3EventBus` in `Zero.Services.Events`); typed `Subject<T>` per event type, no direct subscriber/publisher coupling.
 
 ### DI bootstrap flow
 
@@ -43,12 +44,14 @@ Zero.Meta / Zero.UI / Zero.Gameplay (game logic — depend on Core + Infrastruct
 
 ### Bootstrap steps
 
-Each step extends `BootstrapStepBase` (in `Zero.Infrastructure`) and declares `Name` and `IsCritical`. Pipeline behavior:
+Each step extends `BootstrapStepBase` (in `Zero.Infrastructure`) and declares `Name`, `IsCritical`, and optionally overrides `Timeout` (default 30s) and `MaxRetries` (default 1). Pipeline behavior:
 
 - Steps run **sequentially** in the order defined in `ProjectScopeInstaller`.
-- If `IsCritical = true` and the step throws, the pipeline aborts. Currently only `CrashlyticsStep` is critical.
-- Non-critical failures are logged and swallowed — the game still launches.
-- `OperationCanceledException` always propagates.
+- Each step runs inside a linked CTS that fires `CancelAfter(step.Timeout)`.
+- Non-critical steps that throw (other than `OperationCanceledException` from the outer token) are retried up to `MaxRetries` times, then logged + swallowed.
+- If `IsCritical = true` and the step throws after retries, the pipeline aborts. Currently only `CrashlyticsStep` is critical.
+- `OperationCanceledException` from the outer (caller) token always propagates; timeout cancellation is treated as a step failure subject to retry policy.
+- Per-step progress is sliced into the overall pipeline progress and written to `IBootstrapProgressReporter` (Singleton in `Zero.Infrastructure`). Pipeline writes; `LoadingScreenView` and any HUD progress UI read. Never resolve `BootstrapPipeline` directly from a view — read from the reporter to avoid the Lazy-singleton resolution race.
 
 ### Service convention
 
@@ -64,13 +67,20 @@ Every service follows the same shape — match it when adding new ones:
 
 Most third-party SDK integrations (Ads, IAP, Analytics, Crashlytics, RemoteConfig, Notification, Attribution, Audio, Consent, Input) ship with `Mock<Name>Service` implementations. These are placeholders so the template runs end-to-end without real SDKs — replace with real adapters per game by swapping the binding in the service's installer.
 
+**Exceptions (real impls already shipping):**
+- `UnityLocalizationService` (`Zero.Services.Localization`) wraps `com.unity.localization`. `LocalizationStep` short-circuits with a warning when no `LocalizationSettings` asset is configured, so the template still launches on a fresh clone. A `MockLocalizationService` is also available for headless tests.
+- `R3EventBus` (`Zero.Services.Events`) is the only impl of `IEventBus`; it is not "mock vs real" — it's the single production impl.
+- `UnityPoolService` (`Zero.Services.Pool`) wraps `UnityEngine.Pool.ObjectPool<GameObject>` (renamed from `ReflexPoolService` in Phase 1a; the old name is misleading — nothing in it uses Reflex's pool framework, it's just a Reflex-bound service).
+
 ## Things that are easy to miss
 
 - **Save encryption seeds are placeholders.** `EncryptedJsonSaveService.DefaultAesSeed` / `DefaultHmacSeed` must be replaced with per-game secrets before shipping. The file format is `[HMAC-SHA256 32B][IV 16B][AES-CBC ciphertext]` wrapping a versioned JSON envelope `{ "version": 1, "data": {...} }`. Migrations live in `Migrate(JObject, from, to)`.
 - **Reflex root scopes list is empty** in `Assets/Resources/ReflexSettings.asset` — that's intentional. The root container is built via `OnRootContainerBuilding` from `ProjectScopeInstaller`, not from a scope ScriptableObject.
 - **Only `Bootstrap.unity` is in build settings.** Game scenes are loaded via the scene service (Addressables-backed).
 - **`*.csproj` and `unity_zero.slnx` are gitignored** — they're regenerated by Unity. Don't edit them by hand.
-- **Each asmdef has `autoReferenced: false`.** Adding a reference between assemblies requires editing both the consumer's `.asmdef` and (if you introduce a new service) `Zero.Bootstrap.asmdef`.
+- **Each asmdef has `autoReferenced: false`.** Adding a reference between assemblies requires editing both the consumer's `.asmdef` and (if you introduce a new service) `Zero.Bootstrap.asmdef`. This also bites when wrapping Unity packages whose public API surfaces transitive types — e.g. `Zero.Services.Localization` must list `Unity.ResourceManager` (because `LocalizationSettings.InitializationOperation` returns `AsyncOperationHandle<>`) and `UniTask.Addressables` (for the `.ToUniTask()` extension on that handle).
+- **Gameplay/Meta/UI must not reference each other.** They are peers — Codex review will flag any direct ref. Cross-tier coupling goes through `IEventBus`. Verify with `grep "Zero.UI\|Zero.Meta" Assets/_Project/Scripts/Runtime/Gameplay/Zero.Gameplay.asmdef` (must return empty).
+- **Plan + journal are source of truth for in-flight work.** `docs/dev/PLAN.md` defines phases + decisions; `docs/dev/JOURNAL.md` is append-only history of what landed. After every phase, update the journal AND this CLAUDE.md before merging — see `feedback_phase_workflow.md` in user memory.
 
 ## Build & test
 

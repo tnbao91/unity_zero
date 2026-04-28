@@ -1,14 +1,11 @@
 {
-    "name": "Zero.Gameplay",
-    "rootNamespace": "Zero.Gameplay",
+    "name": "Zero.Services.Events",
+    "rootNamespace": "Zero.Services.Events",
     "references": [
         "Zero.Core",
-        "Zero.Infrastructure",
-        "Zero.Services.Events",
         "UniTask",
         "R3",
-        "Reflex",
-        "LitMotion"
+        "Reflex"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

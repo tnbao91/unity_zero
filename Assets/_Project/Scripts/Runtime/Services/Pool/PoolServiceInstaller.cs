@@ -8,7 +8,7 @@ namespace Zero.Services.Pool
     {
         public static void Install(ContainerBuilder builder)
         {
-            builder.RegisterType(typeof(ReflexPoolService), new[] { typeof(IPoolService) }, Lifetime.Singleton, Resolution.Lazy);
+            builder.RegisterType(typeof(UnityPoolService), new[] { typeof(IPoolService) }, Lifetime.Singleton, Resolution.Lazy);
         }
     }
 }
