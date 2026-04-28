@@ -24,17 +24,23 @@ namespace Zero.Services.Pool
         public async UniTask PrewarmAsync<T>(T prefab, int count, CancellationToken ct = default) where T : Object
         {
             if (prefab == null) throw new ArgumentNullException(nameof(prefab));
+            if (count <= 0) return;
+
             var pool = ResolveGameObjectPool(prefab);
-            for (int i = 0; i < count; i++)
+            const int chunkSize = 8;
+            int remaining = count;
+            while (remaining > 0)
             {
                 ct.ThrowIfCancellationRequested();
-                pool.Prewarm();
-                // Yield every 8 instances during play mode to avoid frame hitches
-                // when prewarming large pools. EditMode skips the yield because
-                // UniTask.Yield defaults to PlayerLoopTiming.Update which does not
-                // tick in editor scripts; the await would otherwise abort the loop
-                // after the first prewarm and break tests.
-                if (Application.isPlaying && (i + 1) % 8 == 0)
+                int batch = Math.Min(chunkSize, remaining);
+                pool.Prewarm(batch);
+                remaining -= batch;
+
+                // Yield between chunks in play mode to avoid frame hitches when
+                // prewarming large pools. Skip in EditMode — UniTask.Yield's
+                // default PlayerLoopTiming.Update does not tick in editor
+                // scripts, so the await would never resume cleanly.
+                if (Application.isPlaying && remaining > 0)
                 {
                     await UniTask.Yield(ct);
                 }
@@ -189,10 +195,17 @@ namespace Zero.Services.Pool
                 _pool.Release(instance);
             }
 
-            internal void Prewarm()
+            // Forces createFunc to run `count` times. Naively looping
+            // Get → Release would only ever produce ONE instance because each
+            // Get pops the just-released one from the internal stack. We have
+            // to hold them all out simultaneously, then release them in one
+            // go so the pool ends up with `count` inactive instances.
+            internal void Prewarm(int count)
             {
-                var inst = _pool.Get();
-                _pool.Release(inst);
+                if (count <= 0) return;
+                var held = new GameObject[count];
+                for (int i = 0; i < count; i++) held[i] = _pool.Get();
+                for (int i = 0; i < count; i++) _pool.Release(held[i]);
             }
 
             public void Dispose()
