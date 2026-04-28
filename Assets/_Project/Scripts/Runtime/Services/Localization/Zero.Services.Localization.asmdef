@@ -5,6 +5,7 @@
         "Zero.Core",
         "Zero.Infrastructure",
         "UniTask",
+        "UniTask.Addressables",
         "R3",
         "Reflex",
         "Unity.Localization",
