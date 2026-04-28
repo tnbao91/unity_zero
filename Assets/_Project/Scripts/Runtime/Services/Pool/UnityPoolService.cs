@@ -121,7 +121,7 @@ namespace Zero.Services.Pool
 #endif
                 _pool = new ObjectPool<GameObject>(
                     createFunc: CreateGameObject,
-                    actionOnGet: OnGet,
+                    actionOnGet: null,
                     actionOnRelease: OnRelease,
                     actionOnDestroy: OnDestroy,
                     collectionCheck: collectionCheck,
@@ -132,12 +132,9 @@ namespace Zero.Services.Pool
 
             private GameObject CreateGameObject()
             {
-                return Object.Instantiate(_prefab);
-            }
-
-            private void OnGet(GameObject go)
-            {
-                go.SetActive(true);
+                var inst = Object.Instantiate(_prefab, _root, false);
+                inst.SetActive(false);
+                return inst;
             }
 
             private void OnRelease(GameObject go)
@@ -158,6 +155,7 @@ namespace Zero.Services.Pool
                 var inst = _pool.Get();
                 inst.transform.SetParent(null, false);
                 inst.transform.SetPositionAndRotation(position, rotation);
+                inst.SetActive(true);
                 return inst;
             }
 
