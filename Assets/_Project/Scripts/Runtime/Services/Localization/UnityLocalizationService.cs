@@ -19,13 +19,12 @@ namespace Zero.Services.Localization
         private readonly Action<Locale> _selectedLocaleHandler;
         private bool _disposed;
 
-        public UnityLocalizationService(ILogService log)
-            : this(log, "Strings") { }
+        private const string DefaultTableName = "Strings";
 
-        public UnityLocalizationService(ILogService log, string defaultTableName)
+        public UnityLocalizationService(ILogService log)
         {
             _log = log;
-            _defaultTable = defaultTableName;
+            _defaultTable = DefaultTableName;
 
             _selectedLocaleHandler = locale =>
             {
