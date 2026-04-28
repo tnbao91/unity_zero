@@ -15,18 +15,41 @@ namespace Zero.Services.Localization
         public override string Name => "Localization";
         public override bool IsCritical => false;
 
-        // Unused field today; reserved so signature lines up with other steps that
-        // depend on the resolved service (and future hooks like preload-table).
         private readonly IL10nService _service;
+        private readonly ILogService _log;
 
-        public LocalizationStep(IL10nService service)
+        public LocalizationStep(IL10nService service, ILogService log)
         {
             _service = service;
+            _log = log;
         }
 
         protected override async UniTask OnExecuteAsync(IProgress<float> progress, CancellationToken ct)
         {
-            await LocalizationSettings.InitializationOperation.ToUniTask(progress: progress, cancellationToken: ct);
+            // Fresh template ships no LocalizationSettings asset / no built Locales.
+            // Skip with a warning instead of letting the package throw
+            // InvalidKeyException through Debug.LogException (which surfaces as a
+            // red console error even though this step is non-critical).
+            if (!LocalizationSettings.HasSettings)
+            {
+                _log?.Warn("[L10n] No LocalizationSettings asset configured — skipping init. Configure via Window → Asset Management → Localization Tables.");
+                progress?.Report(1f);
+                return;
+            }
+
+            try
+            {
+                await LocalizationSettings.InitializationOperation.ToUniTask(progress: progress, cancellationToken: ct);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _log?.Warn($"[L10n] Initialization failed; continuing without localization. {ex.GetType().Name}: {ex.Message}");
+                progress?.Report(1f);
+            }
         }
     }
 }
