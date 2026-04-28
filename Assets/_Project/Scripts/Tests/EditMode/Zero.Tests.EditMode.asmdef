@@ -6,10 +6,12 @@
         "UnityEditor.TestRunner",
         "Zero.Core",
         "Zero.Infrastructure",
-        "Zero.Meta",
-        "Zero.UI",
+        "Zero.Services.Save",
+        "Zero.Services.Pool",
+        "Zero.Services.Events",
+        "Zero.Services.Log",
+        "Zero.Bootstrap",
         "UniTask",
-        "R3",
         "Reflex"
     ],
     "includePlatforms": [
@@ -17,10 +19,8 @@
     ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
-    "overrideReferences": true,
-    "precompiledReferences": [
-        "nunit.framework.dll"
-    ],
+    "overrideReferences": false,
+    "precompiledReferences": [],
     "autoReferenced": false,
     "defineConstraints": [
         "UNITY_INCLUDE_TESTS"

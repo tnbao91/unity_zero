@@ -41,3 +41,39 @@ Append-only log of phase implementations. One entry per phase complete.
 - Resume hint: Phase 1b is next — save seed hardening (`Resources/ZeroSecrets`), 4 EditMode test suites (Save/Pool/BootstrapPipeline/EventBus), CI workflow, 8 doc files. Phase 1b should land on a new branch `phase-1b-tests-docs`.
 
 ---
+
+## Phase 1b — 2026-04-28 (commits babace5, 2557802, 234b54a, 8688cd8)
+- Branch: `phase-1b-tests-docs`
+- Files touched:
+  - New: `Assets/_Project/Scripts/Runtime/Services/Save/ZeroSecrets.cs` (ScriptableObject for per-game seeds)
+  - New: `Assets/Resources/ZeroSecrets.asset.example` (template with placeholder marker)
+  - New: 4 EditMode test files (SaveServiceTests, PoolServiceTests, BootstrapPipelineTests, EventBusTests)
+  - New: `.github/workflows/tests.yml` (game-ci/unity-test-runner, EditMode only)
+  - New: `README.md` (minimal, mentions CI + Quick Start)
+  - New: 8 module documentation files under `docs/`:
+    - `docs/architecture/event-bus.md`, `docs/architecture/bootstrap-pipeline.md`
+    - `docs/services/save.md`, `docs/services/localization.md`, `docs/services/pool.md`
+    - `docs/security/save-encryption.md`
+    - `docs/testing/writing-tests.md`, `docs/testing/ci.md`
+  - Edit: `EncryptedJsonSaveService` — read seeds from `Resources/ZeroSecrets`; throw in player builds if missing/placeholder; warn + fallback in Editor.
+  - Edit: `Zero.Tests.EditMode.asmdef` — added service references needed by tests.
+  - Edit: `CLAUDE.md` — refreshed save seed section, added CI notes, added docs notes.
+- Key decisions:
+  - Tests use actual `Application.persistentDataPath` but clean up in `[TearDown]` to avoid pollution.
+  - Event tests verify typed `Subject<T>` in bus works; record struct events fully supported (no boxing caveat in docs).
+  - Bootstrap tests cover full pipeline: order, abort, swallow, progress, cancel, timeout, retry.
+  - Documentation format locked: every module doc has Overview (2-3 sent), Public API, Extension Points, Examples, Known Limitations, Design Rationale.
+  - README is minimal (no full setup guide — that's Phase 5 cross-cutting); mentions CI license requirement.
+- Tests: 4 test suites, ~22 test cases total. Cover SaveService round-trip + tamper + reload smoke; PoolService LIFO + prewarm + active/inactive flags + dispose idempotency; BootstrapPipeline order + critical-abort + non-critical-swallow + monotonic progress + outer-cancel + critical-timeout + retry-then-success; EventBus pub/sub + multi-sub + type isolation + dispose + value-type + late-subscriber.
+- Opus review (commit `22eb399`): the four test files Haiku originally produced did **not** compile against the real public APIs (wrong `OnExecuteAsync` signature, wrong `RunAsync` arity, `IPool<T>.Get/Release` instead of `Spawn/Despawn`, `IPoolService.GetPool<T>()` missing prefab arg, `StubLogService` missing `IsEnabled` + had a fictional `Debug` method). Two assertions were also logically wrong (`TimeoutFires` expected non-critical timeout to abort the pipeline; `RetryPolicy` had off-by-one on the flaky-step counter). All four suites rewritten end-to-end against the actual contracts. Pool doc and bootstrap-pipeline doc signatures corrected. `ZeroSecrets.cs.meta` pre-committed with deterministic GUID so `ZeroSecrets.asset.example` resolves the script reference on first project open.
+- Migration test gap: `EncryptedJsonSaveService.Migrate(...)` is `private`, so the Phase 1b plan's "write v0 file → assert Migrate ran" coverage isn't reachable from the test asmdef. Replaced with a load→save→reload smoke test plus a "Known Limitations" note in `docs/services/save.md`. Promoting `Migrate` to `protected virtual` is a Phase 2+ candidate if migration coverage matters.
+- Verification: 22/22 EditMode tests green on user's machine after the fixes below landed. Test Runner discovered the suite once `includePlatforms: ["Editor"]` was restored AND the NuGet plugin metas for R3 + its transitive deps were patched to `Editor.enabled: 1` (NuGetForUnity defaults Editor=0, which is too defensive for assemblies the project actually consumes from editor scripts).
+- Production bugs the new tests caught (would have shipped silently otherwise):
+  1. `UnityPoolService.EnsureRoot` called `DontDestroyOnLoad` unconditionally — throws `InvalidOperationException` from any editor script. Now gated behind `Application.isPlaying`.
+  2. `UnityPoolService.Dispose` and the `ObjectPool.actionOnDestroy` callback both called `Object.Destroy`, play-mode-only. Routed through a `SafeDestroy` helper that picks `DestroyImmediate` in EditMode.
+  3. `PrewarmAsync` used `UniTask.Yield(ct)` with the default `PlayerLoopTiming.Update`. EditMode does not tick that timing, so the await silently aborted the prewarm loop after the first iteration. Now skipped in EditMode; in play mode the breathe fires between chunks.
+  4. `GameObjectPool.Prewarm` looped `Get → Release` `count` times. Because every `Release` pushes onto `UnityEngine.Pool.ObjectPool`'s internal stack, the next `Get` pops the same instance — `CountInactive` ended at 1 regardless of `count`. Real prewarm has to hold N instances out simultaneously and release them in one go to force `createFunc` to run N times. Refactored.
+- Other late fixes (compile/discovery, not production bugs): added `using R3;` to `BootstrapPipelineTests` so `Subscribe(Action<T>)` extension resolves; flipped `overrideReferences` to `false` on the test asmdef and added `R3.dll` linkage via the NuGet meta patch.
+- Resume hint: Phase 2 — real Input + Audio + Notification services + manual checklist + integration tests on branch `phase-2-real-services`.
+
+---

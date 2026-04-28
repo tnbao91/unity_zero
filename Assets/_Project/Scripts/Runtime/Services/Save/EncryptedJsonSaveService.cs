@@ -20,7 +20,8 @@ namespace Zero.Services.Save
         private const int IvSize = 16;
         private const int MacSize = 32;
 
-        // IMPORTANT: replace these constants with per-game secrets before shipping.
+        // Editor-only fallback; never used in player builds. Allows iteration without ZeroSecrets.asset.
+        // Production games MUST replace with per-game secrets via Resources/ZeroSecrets.asset.
         private static readonly byte[] DefaultAesSeed = Encoding.UTF8.GetBytes("ZeroTemplate.Aes.SeedV1");
         private static readonly byte[] DefaultHmacSeed = Encoding.UTF8.GetBytes("ZeroTemplate.Hmac.SeedV1");
 
@@ -42,8 +43,37 @@ namespace Zero.Services.Save
         {
             _log = log;
             _filePath = Path.Combine(Application.persistentDataPath, FileName);
-            _aesKey = DeriveKey(DefaultAesSeed);
-            _hmacKey = DeriveKey(DefaultHmacSeed);
+            (byte[] aesKey, byte[] hmacKey) = LoadSeeds(log);
+            _aesKey = aesKey;
+            _hmacKey = hmacKey;
+        }
+
+        private static (byte[] aesKey, byte[] hmacKey) LoadSeeds(ILogService log)
+        {
+            var secrets = Resources.Load<ZeroSecrets>("ZeroSecrets");
+
+            // Missing or placeholder asset
+            if (secrets == null || secrets.IsPlaceholder)
+            {
+                if (Application.isEditor)
+                {
+                    // Editor: warn loudly but continue with fallback so iteration unblocks.
+                    log.Warn("[SAVE] ZeroSecrets.asset missing or unconfigured. Using template defaults.");
+                    log.Warn("[SAVE] For production: copy Assets/Resources/ZeroSecrets.asset.example → Assets/Resources/ZeroSecrets.asset and replace both seed values.");
+                    return (DeriveKey(DefaultAesSeed), DeriveKey(DefaultHmacSeed));
+                }
+                else
+                {
+                    // Player build: fail loudly.
+                    throw new InvalidOperationException(
+                        "ZeroSecrets.asset is missing or still contains placeholder values. " +
+                        "Copy ZeroSecrets.asset.example into Assets/Resources/, rename to ZeroSecrets.asset, " +
+                        "and replace the placeholder seed strings with per-game secrets before shipping.");
+                }
+            }
+
+            // Valid asset: derive keys from configured seeds.
+            return (DeriveKey(secrets.AesSeed), DeriveKey(secrets.HmacSeed));
         }
 
         public async UniTask LoadAsync(CancellationToken ct = default)

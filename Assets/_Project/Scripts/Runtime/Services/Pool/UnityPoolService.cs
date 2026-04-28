@@ -24,12 +24,26 @@ namespace Zero.Services.Pool
         public async UniTask PrewarmAsync<T>(T prefab, int count, CancellationToken ct = default) where T : Object
         {
             if (prefab == null) throw new ArgumentNullException(nameof(prefab));
+            if (count <= 0) return;
+
             var pool = ResolveGameObjectPool(prefab);
-            for (int i = 0; i < count; i++)
+            const int chunkSize = 8;
+            int remaining = count;
+            while (remaining > 0)
             {
                 ct.ThrowIfCancellationRequested();
-                pool.Prewarm();
-                if (i % 8 == 0) await UniTask.Yield(ct); // breathe
+                int batch = Math.Min(chunkSize, remaining);
+                pool.Prewarm(batch);
+                remaining -= batch;
+
+                // Yield between chunks in play mode to avoid frame hitches when
+                // prewarming large pools. Skip in EditMode — UniTask.Yield's
+                // default PlayerLoopTiming.Update does not tick in editor
+                // scripts, so the await would never resume cleanly.
+                if (Application.isPlaying && remaining > 0)
+                {
+                    await UniTask.Yield(ct);
+                }
             }
         }
 
@@ -69,7 +83,16 @@ namespace Zero.Services.Pool
             _disposed = true;
             foreach (var p in _pools.Values) p.Dispose();
             _pools.Clear();
-            if (_root != null) Object.Destroy(_root.gameObject);
+            if (_root != null) SafeDestroy(_root.gameObject);
+        }
+
+        // Object.Destroy is play-mode only; EditMode tests + editor scripts must
+        // use DestroyImmediate. Centralised so the runtime path stays the same.
+        private static void SafeDestroy(GameObject go)
+        {
+            if (go == null) return;
+            if (Application.isPlaying) Object.Destroy(go);
+            else Object.DestroyImmediate(go);
         }
 
         private GameObjectPool ResolveGameObjectPool<T>(T prefab) where T : Object
@@ -90,7 +113,14 @@ namespace Zero.Services.Pool
         {
             if (_root != null) return;
             var go = new GameObject("[Zero.Pools]");
-            Object.DontDestroyOnLoad(go);
+            // DontDestroyOnLoad throws InvalidOperationException in EditMode
+            // (Editor scripts and EditMode tests). At runtime the pool root
+            // must survive scene loads; in the Editor we just leave it parented
+            // to the active scene — good enough for tests and tooling.
+            if (Application.isPlaying)
+            {
+                Object.DontDestroyOnLoad(go);
+            }
             go.SetActive(true);
             _root = go.transform;
         }
@@ -145,7 +175,7 @@ namespace Zero.Services.Pool
 
             private void OnDestroy(GameObject go)
             {
-                Object.Destroy(go);
+                SafeDestroy(go);
             }
 
             public GameObject Spawn() => Spawn(Vector3.zero, Quaternion.identity);
@@ -165,10 +195,17 @@ namespace Zero.Services.Pool
                 _pool.Release(instance);
             }
 
-            internal void Prewarm()
+            // Forces createFunc to run `count` times. Naively looping
+            // Get → Release would only ever produce ONE instance because each
+            // Get pops the just-released one from the internal stack. We have
+            // to hold them all out simultaneously, then release them in one
+            // go so the pool ends up with `count` inactive instances.
+            internal void Prewarm(int count)
             {
-                var inst = _pool.Get();
-                _pool.Release(inst);
+                if (count <= 0) return;
+                var held = new GameObject[count];
+                for (int i = 0; i < count; i++) held[i] = _pool.Get();
+                for (int i = 0; i < count; i++) _pool.Release(held[i]);
             }
 
             public void Dispose()
