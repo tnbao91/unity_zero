@@ -15,12 +15,14 @@ namespace Zero.Services.Localization
         public override string Name => "Localization";
         public override bool IsCritical => false;
 
-        private readonly IL10nService _service;
         private readonly ILogService _log;
 
+        // IL10nService is taken in the constructor purely to ensure the service
+        // is constructed (and its SelectedLocaleChanged subscription is wired)
+        // by the time this step runs, even though the step doesn't call into it.
         public LocalizationStep(IL10nService service, ILogService log)
         {
-            _service = service;
+            _ = service;
             _log = log;
         }
 
