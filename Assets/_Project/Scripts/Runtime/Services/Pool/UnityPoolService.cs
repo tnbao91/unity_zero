@@ -69,7 +69,16 @@ namespace Zero.Services.Pool
             _disposed = true;
             foreach (var p in _pools.Values) p.Dispose();
             _pools.Clear();
-            if (_root != null) Object.Destroy(_root.gameObject);
+            if (_root != null) SafeDestroy(_root.gameObject);
+        }
+
+        // Object.Destroy is play-mode only; EditMode tests + editor scripts must
+        // use DestroyImmediate. Centralised so the runtime path stays the same.
+        private static void SafeDestroy(GameObject go)
+        {
+            if (go == null) return;
+            if (Application.isPlaying) Object.Destroy(go);
+            else Object.DestroyImmediate(go);
         }
 
         private GameObjectPool ResolveGameObjectPool<T>(T prefab) where T : Object
@@ -152,7 +161,7 @@ namespace Zero.Services.Pool
 
             private void OnDestroy(GameObject go)
             {
-                Object.Destroy(go);
+                SafeDestroy(go);
             }
 
             public GameObject Spawn() => Spawn(Vector3.zero, Quaternion.identity);
