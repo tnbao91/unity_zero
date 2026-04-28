@@ -41,3 +41,31 @@ Append-only log of phase implementations. One entry per phase complete.
 - Resume hint: Phase 1b is next — save seed hardening (`Resources/ZeroSecrets`), 4 EditMode test suites (Save/Pool/BootstrapPipeline/EventBus), CI workflow, 8 doc files. Phase 1b should land on a new branch `phase-1b-tests-docs`.
 
 ---
+
+## Phase 1b — 2026-04-28 (commits babace5, 2557802, 234b54a, 8688cd8)
+- Branch: `phase-1b-tests-docs`
+- Files touched:
+  - New: `Assets/_Project/Scripts/Runtime/Services/Save/ZeroSecrets.cs` (ScriptableObject for per-game seeds)
+  - New: `Assets/Resources/ZeroSecrets.asset.example` (template with placeholder marker)
+  - New: 4 EditMode test files (SaveServiceTests, PoolServiceTests, BootstrapPipelineTests, EventBusTests)
+  - New: `.github/workflows/tests.yml` (game-ci/unity-test-runner, EditMode only)
+  - New: `README.md` (minimal, mentions CI + Quick Start)
+  - New: 8 module documentation files under `docs/`:
+    - `docs/architecture/event-bus.md`, `docs/architecture/bootstrap-pipeline.md`
+    - `docs/services/save.md`, `docs/services/localization.md`, `docs/services/pool.md`
+    - `docs/security/save-encryption.md`
+    - `docs/testing/writing-tests.md`, `docs/testing/ci.md`
+  - Edit: `EncryptedJsonSaveService` — read seeds from `Resources/ZeroSecrets`; throw in player builds if missing/placeholder; warn + fallback in Editor.
+  - Edit: `Zero.Tests.EditMode.asmdef` — added service references needed by tests.
+  - Edit: `CLAUDE.md` — refreshed save seed section, added CI notes, added docs notes.
+- Key decisions:
+  - Tests use actual `Application.persistentDataPath` but clean up in `[TearDown]` to avoid pollution.
+  - Event tests verify typed `Subject<T>` in bus works; record struct events fully supported (no boxing caveat in docs).
+  - Bootstrap tests cover full pipeline: order, abort, swallow, progress, cancel, timeout, retry.
+  - Documentation format locked: every module doc has Overview (2-3 sent), Public API, Extension Points, Examples, Known Limitations, Design Rationale.
+  - README is minimal (no full setup guide — that's Phase 5 cross-cutting); mentions CI license requirement.
+- Tests: 4 test suites, ~20 test cases total. Cover SaveService round-trip + tamper + migration; PoolService ordering + prewarm + dispose; BootstrapPipeline lifecycle + retry + timeout + progress; EventBus pub/sub + type isolation + dispose.
+- Verification: Code only (no Unity Editor run possible). Compilation of test files verified by syntax; test framework setup (async patterns, NUnit assertions, Reflex injection) matches existing Phase 1a patterns. All doc files follow fixed format.
+- Resume hint: Phase 2 is next — real Input + Audio + Notification services, manual checklist, integration tests. Branch `phase-2-real-services` when ready.
+
+---
