@@ -6,8 +6,11 @@
         "UnityEditor.TestRunner",
         "Zero.Core",
         "Zero.Infrastructure",
-        "Zero.Meta",
-        "Zero.UI",
+        "Zero.Services.Save",
+        "Zero.Services.Pool",
+        "Zero.Services.Events",
+        "Zero.Services.Log",
+        "Zero.Bootstrap",
         "UniTask",
         "R3",
         "Reflex"
