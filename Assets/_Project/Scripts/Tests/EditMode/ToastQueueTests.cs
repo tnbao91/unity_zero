@@ -1,7 +1,12 @@
-using NUnit.Framework;
+using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
+using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
+using Zero.Core;
 using Zero.UI;
 
 namespace Zero.Tests.EditMode
@@ -9,60 +14,47 @@ namespace Zero.Tests.EditMode
     public sealed class ToastQueueTests
     {
         [UnityTest]
-        public IEnumerator MaxQueueCapacity_DropOldest()
+        public IEnumerator MaxQueueCapacity_DropOldest() => UniTask.ToCoroutine(async () =>
         {
-            return UniTask.ToCoroutine(async () =>
+            var mockAsset = new MockAssetService();
+            var mockLayer = new GameObject("[UI.Toast]").transform;
+
+            try
             {
-                var mockAsset = new MockAssetService();
-                var mockLayer = new GameObject("[UI.Toast]").transform;
+                var queue = new ToastQueue(mockAsset, mockLayer);
+                await queue.InitializeAsync();
 
-                try
+                for (int i = 0; i < 16; i++)
                 {
-                    var queue = new ToastQueue(mockAsset, mockLayer);
-                    await queue.InitializeAsync();
-
-                    // Enqueue to max capacity
-                    for (int i = 0; i < 16; i++)
-                    {
-                        queue.Show($"Toast {i}", 1f);
-                    }
-
-                    // Enqueue one more — should drop the oldest
-                    queue.Show("Toast 16", 1f);
-
-                    // Verify behavior (we can't directly inspect the queue, so this is more of a smoke test)
-                    Assert.Pass("Toast queue handles max capacity without exception");
+                    queue.Show($"Toast {i}", 1f);
                 }
-                finally
-                {
-                    Object.DestroyImmediate(mockLayer.gameObject);
-                }
-            });
-        }
 
-        private sealed class MockAssetService : Zero.Core.IAssetService
+                queue.Show("Toast 16", 1f);
+
+                Assert.Pass("Toast queue handles max capacity without exception");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(mockLayer.gameObject);
+            }
+        });
+
+        private sealed class MockAssetService : IAssetService
         {
-            public System.Threading.Tasks.Task<bool> HasKeyAsync<T>(string key, System.Threading.CancellationToken ct = default) where T : class
-            {
-                return System.Threading.Tasks.Task.FromResult(false);
-            }
-
-            public System.Threading.Tasks.Task<Zero.Core.IAssetHandle<T>> LoadAsync<T>(string key, System.Threading.CancellationToken ct = default) where T : class
-            {
-                throw new System.NotImplementedException();
-            }
-
-            public System.Threading.Tasks.Task<Zero.Core.IAssetHandle<T>> PreloadAsync<T>(string key, System.Threading.CancellationToken ct = default) where T : class
-            {
-                throw new System.NotImplementedException();
-            }
-
             public int ActiveHandleCount => 0;
 
-            public System.Threading.Tasks.Task InitializeAsync(System.Threading.CancellationToken ct = default)
-            {
-                return System.Threading.Tasks.Task.CompletedTask;
-            }
+            public UniTask InitializeAsync(CancellationToken ct = default) => UniTask.CompletedTask;
+
+            public UniTask<bool> HasKeyAsync<T>(string key, CancellationToken ct = default)
+                where T : UnityEngine.Object
+                => UniTask.FromResult(false);
+
+            public UniTask<IAssetHandle<T>> LoadAsync<T>(string key, CancellationToken ct = default)
+                where T : UnityEngine.Object
+                => throw new NotImplementedException();
+
+            public UniTask PreloadAsync(IReadOnlyList<string> keys, IProgress<float> progress = null, CancellationToken ct = default)
+                => UniTask.CompletedTask;
         }
     }
 }
