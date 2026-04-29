@@ -96,15 +96,15 @@ namespace Zero.Bootstrap
                 var audio = c.Resolve<IAudioService>();
                 var time = c.Resolve<ITimeService>();
                 var notif = c.Resolve<INotificationService>();
-                var ui = c.Resolve<IUIService>();
                 var reporter = c.Resolve<IBootstrapProgressReporter>();
 
                 // Order: Crashlytics first (critical), Log/Profile next so subsequent steps
                 // can log + read device info, Save moved up so any later step can read
                 // persisted settings (audio volume, locale preference, consent state).
                 // Localization sits next to Analytics so UI text is ready before Attribution
-                // / Ads / IAP surface any localized errors.
-                // UI comes after Localization so LocalizedText components work properly.
+                // / Ads / IAP surface any localized errors. UIService has no bootstrap
+                // step — consumers attach a UIRoot MonoBehaviour to their scene to wire
+                // layer canvases at scene-load time.
                 var steps = new IBootstrapStep[]
                 {
                     new CrashlyticsStep(crash),
@@ -116,7 +116,6 @@ namespace Zero.Bootstrap
                     new RemoteConfigStep(remote),
                     new AnalyticsStep(analytics),
                     new LocalizationStep(l10n, log),
-                    new UIStep(ui),
                     new AttributionStep(attrib),
                     new AdsStep(ads, placement),
                     new IapStep(iap),

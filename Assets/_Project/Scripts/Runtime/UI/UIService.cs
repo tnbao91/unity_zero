@@ -21,20 +21,86 @@ namespace Zero.UI
         private readonly IAssetService _assetService;
         private readonly IEventBus _eventBus;
         private readonly ILogService _logService;
-        private readonly Dictionary<Core.UiLayer, Transform> _layerRoots;
+        private readonly Dictionary<Core.UiLayer, Transform> _layerRoots = new();
         private readonly Dictionary<Core.UiLayer, PopupStack> _popupStacks = new();
         private readonly Stack<(GameObject instance, IPopupHandle handle, string key, GameObject backdrop)> _activePopups = new();
 
         private ScreenManager _screenManager;
         private ToastQueue _toastQueue;
         private bool _disposed;
+        private bool _rootAttached;
 
         public UIService(IAssetService assetService, IEventBus eventBus, ILogService logService)
         {
             _assetService = assetService;
             _eventBus = eventBus;
             _logService = logService;
-            _layerRoots = new Dictionary<Core.UiLayer, Transform>();
+        }
+
+        public void AttachRoot(IReadOnlyDictionary<Core.UiLayer, Transform> layers)
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(UIService));
+            if (layers == null)
+                throw new ArgumentNullException(nameof(layers));
+            if (_rootAttached)
+            {
+                _logService.Warn("[UI] AttachRoot called while a root is already attached. Detaching first.");
+                DetachRoot();
+            }
+
+            _layerRoots.Clear();
+            foreach (var kv in layers)
+            {
+                if (kv.Value == null)
+                {
+                    _logService.Warn($"[UI] AttachRoot: layer '{kv.Key}' has no Transform; skipping.");
+                    continue;
+                }
+                _layerRoots[kv.Key] = kv.Value;
+            }
+
+            _popupStacks.Clear();
+            foreach (Core.UiLayer layer in Enum.GetValues(typeof(Core.UiLayer)))
+            {
+                _popupStacks[layer] = new PopupStack();
+            }
+
+            if (_layerRoots.TryGetValue(Core.UiLayer.Hud, out var hudRoot))
+                _screenManager = new ScreenManager(_assetService, hudRoot);
+            if (_layerRoots.TryGetValue(Core.UiLayer.System, out var sysRoot))
+            {
+                _toastQueue = new ToastQueue(_assetService, sysRoot);
+                _toastQueue.InitializeAsync().Forget();
+            }
+
+            _rootAttached = true;
+            _logService.Info("[UI] Root attached.");
+        }
+
+        public void DetachRoot()
+        {
+            if (!_rootAttached) return;
+
+            _screenManager?.Dispose();
+            _screenManager = null;
+            _toastQueue?.Dispose();
+            _toastQueue = null;
+
+            _activePopups.Clear();
+            foreach (var stack in _popupStacks.Values) stack.Clear();
+            _popupStacks.Clear();
+            _layerRoots.Clear();
+
+            _rootAttached = false;
+            _logService.Info("[UI] Root detached.");
+        }
+
+        private void EnsureRootAttached()
+        {
+            if (!_rootAttached)
+                throw new InvalidOperationException(
+                    "UIService has no UIRoot attached. Add a UIRoot MonoBehaviour to the active scene and assign its layer Transforms.");
         }
 
         private GameObject CreateBackdrop(string popupKey, int sortOrder)
@@ -64,26 +130,6 @@ namespace Zero.UI
             return backdropGo;
         }
 
-        public async UniTask InitializeAsync(CancellationToken ct = default)
-        {
-            // Build layer canvases
-            LayerCanvas.Build(_layerRoots);
-
-            // Initialize popup stacks for each layer
-            foreach (Core.UiLayer layer in System.Enum.GetValues(typeof(Core.UiLayer)))
-            {
-                _popupStacks[layer] = new PopupStack();
-            }
-
-            // Initialize managers
-            _screenManager = new ScreenManager(_assetService, _layerRoots[Core.UiLayer.Hud]);
-            _toastQueue = new ToastQueue(_assetService, _layerRoots[Core.UiLayer.System]);
-
-            await _toastQueue.InitializeAsync(ct);
-
-            _logService.Info("[UI] Initialized (4 layer canvases spawned)");
-        }
-
         public async UniTask<TResult> PushAsync<TPopup, TData, TResult>(
             TData data,
             PopupTransition transition = PopupTransition.Fade,
@@ -93,6 +139,7 @@ namespace Zero.UI
         {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(UIService));
+            EnsureRootAttached();
 
             var popupType = typeof(TPopup);
             string popupKey = popupType.Name.ToLowerInvariant();
@@ -205,6 +252,7 @@ namespace Zero.UI
         {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(UIService));
+            EnsureRootAttached();
 
             if (_activePopups.Count > 0)
             {
@@ -246,14 +294,19 @@ namespace Zero.UI
         {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(UIService));
+            EnsureRootAttached();
 
             await _screenManager.ShowAsync<TScreen, TData>(data, ct);
         }
 
         public void ShowToast(string text, float duration = 2f)
         {
-            if (_disposed)
+            if (_disposed) return;
+            if (!_rootAttached)
+            {
+                _logService.Warn("[UI] ShowToast called with no UIRoot attached. Message dropped: " + text);
                 return;
+            }
 
             _toastQueue.Show(text, duration);
         }

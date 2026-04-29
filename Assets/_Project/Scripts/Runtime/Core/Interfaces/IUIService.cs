@@ -1,4 +1,4 @@
-using System;
+using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -23,7 +23,12 @@ namespace Zero.Core
 
     public interface IUIService
     {
-        UniTask InitializeAsync(CancellationToken ct = default);
+        // Layer canvases live in the consumer's scene. A UIRoot MonoBehaviour
+        // calls AttachRoot in OnEnable and DetachRoot in OnDisable. Push/Show/Toast
+        // throw InvalidOperationException if no root is attached.
+        void AttachRoot(IReadOnlyDictionary<UiLayer, Transform> layers);
+        void DetachRoot();
+
         UniTask<TResult> PushAsync<TPopup, TData, TResult>(
             TData data,
             PopupTransition transition = PopupTransition.Fade,
