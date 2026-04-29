@@ -178,4 +178,24 @@ Append-only log of phase implementations. One entry per phase complete.
   8. `refactor(ui): remove unused System.Linq` — Removed unused `using System.Linq` from UIService.cs (Bug 22).
 - Verification: compile checked by diff inspection (IL2CPP compat via interface dispatch, no more fictional APIs, no more dynamic keyword, consistent sort order formula, proper exception cleanup, no double-dispose). Asmdef references verified; all new types internal-scoped except IPopupHandle (public for interface impl). Tests remain unchanged (PopupStackTests, ToastQueueTests, UITransitionInterruptionTests expected to pass).
 
+### Round 3 — Editor compile fixes (2026-04-30)
+
+User Editor surfaced multiple compile errors after round 2 patches. Each fixed in turn:
+
+- `record struct` in `UIEvents.cs` requires C# 10; Unity 6 LTS uses C# 9. Converted to plain `readonly struct` with explicit ctor (commit `8d24457`).
+- `LoadingScreenView` / `LocalizedText` referenced non-existent `R3.IDisposable`; R3 returns `System.IDisposable`. Added `using System; using R3;`. `PopupBase.CurrentData` had `protected get; protected set;` — CS0273 (setter must be more restrictive than property); changed to `private set` (commit `e0eed6a`).
+- `UIServiceInstaller` used Reflex's generic `RegisterType<T>().As<I>()` API which doesn't exist in this Reflex version; switched to `RegisterType(typeof(UIService), new[] { typeof(IUIService) }, ...)` matching `AudioServiceInstaller`. `UITransitions` called `BindToCanvasGroupAlpha` (fictional); correct LitMotion uGUI extension is `BindToAlpha(CanvasGroup)` (verified in package source `LitMotionUGUIExtensions.cs:146`). `PopupStack._queue` was `Queue<PopupEntry>` but methods enqueued raw `GameObject`; aligned to `Queue<GameObject>`. `Object` ambiguous between `UnityEngine.Object` and `System.Object` in UIService/ScreenManager/ToastQueue; added `using Object = UnityEngine.Object` alias (commit `8d8cb92`).
+- Tests: missing `using UnityEngine.TestTools;` for `[UnityTest]`. `MockAssetService` used `Task<T>` with `where T : class`; rewritten to `UniTask<T>` with `where T : UnityEngine.Object` matching `IAssetService`; added missing `PreloadAsync(IReadOnlyList<string>, IProgress<float>, CancellationToken)` (commits `73cad0a`, `6942892`).
+- `UITransitionInterruptionTests.SequentialTransitions_AfterCancellation_Works` failed at runtime: LitMotion's `ToUniTask` awaits PlayerLoop Update ticks; EditMode does not tick the default Update timing, so the second (non-cancelled) tween never completes. Marked `[Ignore("Requires PlayMode")]`; PlayMode coverage moved to manual checklist (commit `2f1240a`).
+
+### Round 4 — UIRoot refactor (2026-04-30, commit `0bd13a3`)
+
+User direction: framework should not init UI in code. Consumer authors UI hierarchy in their own scene and points a `UIRoot` MonoBehaviour at the four layer Transforms; `Bootstrap.unity` stays minimal (splash-only).
+
+- Deleted `LayerCanvas.cs` and `UIStep.cs`. Removed UIStep from `ProjectScopeInstaller.steps`.
+- `IUIService`: removed `InitializeAsync`; added `AttachRoot(IReadOnlyDictionary<UiLayer, Transform>)` and `DetachRoot()`.
+- `UIService`: layer Transforms populated by `AttachRoot`; `ScreenManager` + `ToastQueue` instantiated inside `AttachRoot`. All `Push/Pop/ShowScreen` guarded by `EnsureRootAttached()` → throws `InvalidOperationException` with explicit fix instructions if no root. `ShowToast` warns + drops message (fire-and-forget API stays no-throw).
+- New `UIRoot.cs`: 4 SerializeField Transforms (Hud/Popup/Overlay/System), `[Inject] IUIService`. `OnEnable` builds layer dict and calls `AttachRoot`; `OnDisable` calls `DetachRoot`. Emits clear console errors if Reflex didn't inject (scene loaded outside container scope).
+- Docs: new `docs/ui/ui-root.md` with step-by-step scene-setup recipe (8-step happy path, troubleshooting table, design rationale). `popup-stack.md` / `loading-screen.md` / `toast.md` updated to call out the UIRoot prerequisite. `CLAUDE.md` "Mock-first exceptions" entry rewritten to reflect consumer-owned root pattern.
+
 ---

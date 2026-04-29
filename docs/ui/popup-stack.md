@@ -4,6 +4,8 @@
 
 The popup stack manages modal dialogs that appear on top of the game UI. Each popup is modally presented, blocking interaction with layers below until dismissed. Popups support typed generic data binding and result returns, automatic layering and sort order management, and LitMotion-powered transitions.
 
+> **Prerequisite:** the active scene must have a `UIRoot` MonoBehaviour with its layer Transforms assigned. Without one, `PushAsync` throws `InvalidOperationException("UIService has no UIRoot attached.")`. See [`ui-root.md`](ui-root.md) for the one-time scene setup recipe.
+
 ## Public API
 
 ```csharp
@@ -89,9 +91,10 @@ bool confirmed = await uiService.PushAsync<ConfirmPopup, string, bool>(
 ## Known Limitations
 
 - Popups are rendered in the `Popup` layer (sort order 200) by default. Custom layers require manual canvas assignment.
-- Modal mask (backdrop) is not auto-rendered; consumer must include a raycast-blocker Image in their popup prefab if input blocking is desired.
+- Modal mask backdrop **is** auto-rendered (semi-transparent black raycast-blocker behind each popup). Tap-outside publishes `PopupBackdropTapped` via `IEventBus`; the consumer decides whether to close the popup.
 - Stack does not support queuing or priority-based insertion; all pushes append to the stack top.
 - Nested popups are supported but consume memory for each instance in the stack.
+- Layer canvases are **not** spawned by the framework. The active scene must have a `UIRoot` component (see [`ui-root.md`](ui-root.md)).
 
 ## Design Rationale
 

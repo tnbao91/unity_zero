@@ -25,12 +25,12 @@ LoadingScreenView does not expose extension points — it is a leaf component. T
 ## Examples
 
 In your `Loading.unity` scene:
-1. Create a Canvas and configure it as a fullscreen overlay.
-2. Add a Slider (for progress bar) and a TextMeshProUGUI (for step name).
-3. Create an empty GameObject and attach the LoadingScreenView component.
+1. Set up `UIRoot` per [`ui-root.md`](ui-root.md) (one-time per scene).
+2. Under the `[UI.Hud]` Canvas, add a Slider (for progress bar) and a TextMeshProUGUI (for step name).
+3. On the same GameObject — or a child of `[UI.Hud]` — attach the `LoadingScreenView` component.
 4. Drag the Slider into the `_progressSlider` field.
 5. Drag the TextMeshProUGUI into the `_stepNameText` field.
-6. Play the scene; the loading screen subscribes to `IBootstrapProgressReporter` via Reflex injection.
+6. Play the scene; the loading screen subscribes to `IBootstrapProgressReporter` via Reflex injection. (Note: progress only advances during bootstrap; if your Loading scene loads *after* bootstrap completes, progress will already be at 1.0.)
 
 ```csharp
 // Custom loading screen with a fill image instead of slider

@@ -4,6 +4,8 @@
 
 Toasts are short, self-dismissing messages that appear in the System layer (topmost, sort order 400). They queue automatically — if multiple toasts are requested in quick succession, they display sequentially without overlap. The queue caps at 16 messages; older messages are dropped with a warning if exceeded.
 
+> **Prerequisite:** the active scene must have a `UIRoot` with the System layer Transform assigned. If no root is attached, `ShowToast` logs a warning and silently drops the message (it does **not** throw — toast is fire-and-forget). See [`ui-root.md`](ui-root.md).
+
 ## Public API
 
 ```csharp
@@ -64,6 +66,7 @@ uiService.ShowToast("Level Complete!", 3f);
 - Queue cap is hard-coded at 16. Exceeding it drops the oldest message (not the newest).
 - Toast prefab must be provided by the consumer; the template ships no default toast.
 - Toasts do not interact with each other — no merging duplicates, no collision avoidance.
+- `ShowToast` is no-op when no `UIRoot` is attached (logs warning, drops message).
 
 ## Design Rationale
 
