@@ -62,6 +62,15 @@ namespace Zero.UI
             return false;
         }
 
+        /// <summary>
+        /// Peek the sort order that the next push would receive.
+        /// Used by backdrop creation to ensure backdrop sorts behind the popup.
+        /// </summary>
+        public int PeekNextSortOrder(int layerBaseSortOrder)
+        {
+            return layerBaseSortOrder + _sortOrderOffset;
+        }
+
         public bool TryReplace(GameObject newPopupInstance, int layerBaseSortOrder, out GameObject oldInstance)
         {
             if (_stack.Count > 0)
