@@ -13,9 +13,13 @@
         "Zero.Services.Audio",
         "Zero.Services.Notification",
         "Zero.Services.Input",
+        "Zero.Services.Localization",
+        "Zero.UI",
         "Zero.Bootstrap",
         "UniTask",
-        "Reflex"
+        "R3",
+        "Reflex",
+        "LitMotion"
     ],
     "includePlatforms": [
         "Editor"

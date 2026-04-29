@@ -9,7 +9,10 @@
         "UniTask",
         "R3",
         "Reflex",
-        "LitMotion"
+        "LitMotion",
+        "LitMotion.Extensions",
+        "Unity.TextMeshPro",
+        "Unity.Addressables"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

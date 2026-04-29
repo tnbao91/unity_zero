@@ -188,12 +188,105 @@ After verifying each feature individually:
 
 ---
 
+---
+
+## Phase 3 UI Verification
+
+### Loading Screen
+
+**Setup:**
+1. Create a temporary `Loading.unity` scene
+2. Add a Canvas with Slider (progress bar) and TextMeshProUGUI (step name)
+3. Attach `LoadingScreenView` component to an empty GameObject, wire the Slider and Text fields
+4. In Bootstrap scene, load `Loading.unity` before bootstrap completes (via SceneService)
+
+**Editor:**
+1. Open `Loading.unity` and Press Play (will fail without bootstrap context — expected)
+2. Build a minimal test scene that initializes `IBootstrapProgressReporter` manually:
+   ```csharp
+   var reporter = new BootstrapProgressReporter();
+   var view = gameObject.AddComponent<LoadingScreenView>();
+   // Manually drive progress
+   for (float p = 0; p <= 1; p += 0.05f)
+   {
+       reporter.SetProgress(p, $"Step {p:P0}");
+       await UniTask.Delay(100);
+   }
+   ```
+3. **Expected:** Slider fills from 0 to 1; step name updates each frame
+4. **Verify:** No exceptions; UI is responsive
+
+### Safe Area
+
+**iOS Simulator (with notch):**
+1. Create a Panel with `SafeAreaFitter` in a test scene
+2. Add a colored background Image so the panel is visible
+3. Press Play
+4. **Expected:** Panel is inset from the notch area (top of screen)
+5. Rotate device (Cmd+Right Arrow in simulator)
+6. **Expected:** Panel re-adjusts anchors; no jitter
+
+**Android Simulator (hole-punch notch):**
+1. Same setup as iOS
+2. **Expected:** Panel adjusts to the center-top notch area
+
+**PC/Editor (no notch):**
+1. Same setup
+2. **Expected:** Panel uses full screen (safe area == full screen)
+
+### LocalizedText
+
+**Setup:**
+1. Create a test scene with TextMeshProUGUI
+2. Attach `LocalizedText`, set `_key` to `ui.test.message`
+3. Ensure a localization table has an entry `ui.test.message` = "Hello"
+
+**Editor:**
+1. Press Play
+2. **Expected:** Text displays "Hello"
+3. In code, call `il10nService.SetLocaleAsync(locale)` to switch locale
+4. **Expected:** Text immediately updates (if the new locale has the key)
+5. **Verify:** No null refs; fallback to key name if translation missing
+
+### Toast Queue
+
+**Setup (not testable headless — queue timestamps and async delays):**
+1. In a test scene, resolve `IUIService`
+2. Add a button that calls:
+   ```csharp
+   uiService.ShowToast("Toast 1", 2f);
+   uiService.ShowToast("Toast 2", 2f);
+   uiService.ShowToast("Toast 3", 2f);
+   ```
+
+**Editor (with toast prefab in Addressables at `ui/toast/default`):**
+1. Click button
+2. **Expected:** Toasts appear sequentially, not overlapping (FIFO)
+3. Each toast displays for ~2s, then auto-dismisses
+4. Next toast appears after previous one finishes
+
+**Without toast prefab:**
+1. **Expected:** No exceptions; console warns "Toast prefab key not found"; ShowToast becomes a no-op
+
+### Layer Canvases
+
+**Editor:**
+1. Open `Bootstrap.unity`, Press Play
+2. In Hierarchy, search for `[Zero.UI]`
+3. **Expected:** Four children: `[Zero.UI.Hud]`, `[Zero.UI.Popup]`, `[Zero.UI.Overlay]`, `[Zero.UI.System]`
+4. Each is a Canvas with `sortingOrder` 100/200/300/400
+5. Stop Play
+6. **Expected:** Canvases disappear (DontDestroyOnLoad is conditional on `Application.isPlaying`)
+
+---
+
 ## Sign-Off
 
-Complete this checklist and commit with message:
+Complete Phase 2 + Phase 3 checklist and commit with message:
 ```
-docs: Phase 2 manual verification passed (input/audio/notification)
+docs: Phase 2–3 manual verification passed (input/audio/notification/ui)
 
+**Phase 2:**
 - Tap fires on device (200ms, <20px window)
 - Swipe fires (≥50px, <500ms window)
 - Pinch fires (two-finger only)
@@ -203,4 +296,11 @@ docs: Phase 2 manual verification passed (input/audio/notification)
 - SFX fires from pool
 - Notification schedules and cancels on iOS/Android
 - Permission cached and not re-requested
+
+**Phase 3:**
+- Loading screen progress bar fills 0→1 during bootstrap
+- Safe area respected on iOS (notch) + Android (hole-punch)
+- LocalizedText updates text on locale change
+- Toast queue shows toasts sequentially (FIFO)
+- Layer canvases spawn at UIStep, persist via DontDestroyOnLoad
 ```
