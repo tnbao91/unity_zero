@@ -6,7 +6,9 @@
         "Zero.Infrastructure",
         "UniTask",
         "R3",
-        "Reflex"
+        "Reflex",
+        "LitMotion",
+        "LitMotion.Animation"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

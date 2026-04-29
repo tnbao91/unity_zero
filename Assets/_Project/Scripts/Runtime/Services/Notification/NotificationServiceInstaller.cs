@@ -8,7 +8,11 @@ namespace Zero.Services.Notification
     {
         public static void Install(ContainerBuilder builder)
         {
+#if ZERO_USE_MOCK_NOTIFICATION
             builder.RegisterType(typeof(MockNotificationService), new[] { typeof(INotificationService) }, Lifetime.Singleton, Resolution.Lazy);
+#else
+            builder.RegisterType(typeof(UnityMobileNotificationService), new[] { typeof(INotificationService) }, Lifetime.Singleton, Resolution.Lazy);
+#endif
         }
     }
 }
