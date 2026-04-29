@@ -7,6 +7,7 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Audio;
 using Zero.Core;
+using Object = UnityEngine.Object;
 
 namespace Zero.Services.Audio
 {
@@ -43,15 +44,25 @@ namespace Zero.Services.Audio
 
         public async UniTask InitializeAsync(CancellationToken ct = default)
         {
-            try
+            // Pre-check: skip LoadAsync if key isn't registered, otherwise Addressables logs a red
+            // InvalidKeyException to the console before our try/catch can convert it to a warn.
+            // Same defensive pattern as LocalizationStep guarding LocalizationSettings.HasSettings.
+            if (await _assetService.HasKeyAsync<AudioMixer>("audio/main_mixer", ct))
             {
-                // Load mixer from Addressables
-                _mixerHandle = await _assetService.LoadAsync<AudioMixer>("audio/main_mixer", ct);
-                _mixer = _mixerHandle.Asset;
+                try
+                {
+                    _mixerHandle = await _assetService.LoadAsync<AudioMixer>("audio/main_mixer", ct);
+                    _mixer = _mixerHandle.Asset;
+                }
+                catch (Exception ex)
+                {
+                    _log.Warn($"[AUDIO] Failed to load mixer from 'audio/main_mixer': {ex.Message}. Falling back to default volumes.");
+                    _mixer = null;
+                }
             }
-            catch (Exception ex)
+            else
             {
-                _log.Warn($"[AUDIO] Failed to load mixer from 'audio/main_mixer': {ex.Message}. Falling back to default volumes.");
+                _log.Warn("[AUDIO] No 'audio/main_mixer' Addressable found. Falling back to per-source volume; see docs/services/audio.md for mixer setup.");
                 _mixer = null;
             }
 

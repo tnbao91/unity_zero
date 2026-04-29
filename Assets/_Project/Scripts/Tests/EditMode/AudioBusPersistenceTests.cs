@@ -157,6 +157,11 @@ namespace Zero.Tests.EditMode
                 return UniTask.FromResult<IAssetHandle<T>>(null);
             }
 
+            public UniTask<bool> HasKeyAsync<T>(string key, CancellationToken ct = default) where T : UnityEngine.Object
+            {
+                return UniTask.FromResult(false);
+            }
+
             public UniTask PreloadAsync(IReadOnlyList<string> keys, IProgress<float> progress = null, CancellationToken ct = default)
             {
                 return UniTask.CompletedTask;
