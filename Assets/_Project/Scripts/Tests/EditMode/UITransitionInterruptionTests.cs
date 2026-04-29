@@ -6,6 +6,7 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 using Zero.UI;
+using Object = UnityEngine.Object;
 
 namespace Zero.Tests.EditMode
 {
