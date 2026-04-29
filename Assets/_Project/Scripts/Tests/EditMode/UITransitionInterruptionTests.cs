@@ -47,6 +47,10 @@ namespace Zero.Tests.EditMode
             });
         }
 
+        // LitMotion's ToUniTask awaits PlayerLoop ticks; EditMode does not tick the
+        // default Update timing, so a non-cancelled tween never completes here.
+        // This scenario is covered by docs/testing/manual-checklist.md instead.
+        [Ignore("Requires PlayMode — LitMotion PlayerLoop does not tick in EditMode")]
         [UnityTest]
         public IEnumerator SequentialTransitions_AfterCancellation_Works()
         {
