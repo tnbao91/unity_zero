@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Zero.Core;
+#if UNITY_ANDROID || UNITY_IOS || UNITY_EDITOR
 using Unity.Notifications;
+#endif
 
 namespace Zero.Services.Notification
 {
@@ -28,6 +30,7 @@ namespace Zero.Services.Notification
 
         public async UniTask InitializeAsync(CancellationToken ct = default)
         {
+#if UNITY_ANDROID || UNITY_IOS || UNITY_EDITOR
             // Initialize NotificationCenter (required before any other calls)
             var args = new NotificationCenterArgs()
             {
@@ -43,11 +46,15 @@ namespace Zero.Services.Notification
             }
 
             _log.Info("[NOTIF] Initialized (unified cross-platform API)");
+#else
+            _log.Info("[NOTIF] no-op on unsupported platform");
+#endif
             await UniTask.CompletedTask;
         }
 
         public async UniTask<bool> RequestPermissionAsync(CancellationToken ct = default)
         {
+#if UNITY_ANDROID || UNITY_IOS || UNITY_EDITOR
             // If already requested, return cached state
             if (_permissionRequested)
             {
@@ -60,20 +67,27 @@ namespace Zero.Services.Notification
                 var permissionRequest = NotificationCenter.RequestPermission();
                 await permissionRequest.ToUniTask(cancellationToken: ct);
 
-                _permissionRequested = permissionRequest.Granted;
-                _saveService.Set("notification.permission.requested", _permissionRequested);
-                _log.Info($"[NOTIF] Permission request completed (granted: {_permissionRequested})");
-                return _permissionRequested;
+                bool granted = permissionRequest.Status == NotificationsPermissionStatus.Granted;
+                _permissionRequested = granted;
+                _saveService.Set("notification.permission.requested", granted);
+                _log.Info($"[NOTIF] Permission request completed (granted: {granted})");
+                return granted;
             }
             catch (Exception ex)
             {
                 _log.Error($"[NOTIF] Permission request failed: {ex.Message}");
                 return false;
             }
+#else
+            _log.Info("[NOTIF] no-op on unsupported platform");
+            _permissionRequested = true;
+            return true;
+#endif
         }
 
         public void Schedule(string id, string title, string body, TimeSpan delay)
         {
+#if UNITY_ANDROID || UNITY_IOS || UNITY_EDITOR
             try
             {
                 var notification = new Notification
@@ -95,10 +109,14 @@ namespace Zero.Services.Notification
             {
                 _log.Error($"[NOTIF] Schedule failed for '{id}': {ex.Message}");
             }
+#else
+            _log.Info("[NOTIF] no-op on unsupported platform");
+#endif
         }
 
         public void Cancel(string id)
         {
+#if UNITY_ANDROID || UNITY_IOS || UNITY_EDITOR
             try
             {
                 if (_scheduledIds.TryGetValue(id, out int numericId))
@@ -116,10 +134,14 @@ namespace Zero.Services.Notification
             {
                 _log.Error($"[NOTIF] Cancel failed for '{id}': {ex.Message}");
             }
+#else
+            _log.Info("[NOTIF] no-op on unsupported platform");
+#endif
         }
 
         public void CancelAll()
         {
+#if UNITY_ANDROID || UNITY_IOS || UNITY_EDITOR
             try
             {
                 NotificationCenter.CancelAllScheduledNotifications();
@@ -130,6 +152,10 @@ namespace Zero.Services.Notification
             {
                 _log.Error($"[NOTIF] CancelAll failed: {ex.Message}");
             }
+#else
+            _log.Info("[NOTIF] no-op on unsupported platform");
+            _scheduledIds.Clear();
+#endif
         }
     }
 }
