@@ -30,22 +30,30 @@ namespace Zero.Services.Notification
 
         public async UniTask InitializeAsync(CancellationToken ct = default)
         {
-#if UNITY_ANDROID || UNITY_IOS || UNITY_EDITOR
-            // Initialize NotificationCenter (required before any other calls)
-            var args = new NotificationCenterArgs()
-            {
-                AndroidChannelId = "default",
-                PresentationOptions = NotificationPresentation.Alert | NotificationPresentation.Badge | NotificationPresentation.Sound,
-            };
-            NotificationCenter.Initialize(args);
-
-            // Load persisted permission state
+            // Load persisted permission state — pure C#, runs on every platform / EditMode
             if (_saveService.TryGet("notification.permission.requested", out bool requested))
             {
                 _permissionRequested = requested;
             }
 
-            _log.Info("[NOTIF] Initialized (unified cross-platform API)");
+#if UNITY_ANDROID || UNITY_IOS || UNITY_EDITOR
+            // Wrap NotificationCenter.Initialize: macOS-Editor + headless tests do not have a real
+            // notification subsystem; the iOS-fallback path inside the package P/Invokes native
+            // libs and can throw. Same defensive pattern as LocalizationStep.
+            try
+            {
+                var args = new NotificationCenterArgs()
+                {
+                    AndroidChannelId = "default",
+                    PresentationOptions = NotificationPresentation.Alert | NotificationPresentation.Badge | NotificationPresentation.Sound,
+                };
+                NotificationCenter.Initialize(args);
+                _log.Info("[NOTIF] Initialized (unified cross-platform API)");
+            }
+            catch (Exception ex)
+            {
+                _log.Warn($"[NOTIF] NotificationCenter.Initialize failed (likely Editor on non-mobile): {ex.Message}. Schedule/Cancel will no-op.");
+            }
 #else
             _log.Info("[NOTIF] no-op on unsupported platform");
 #endif

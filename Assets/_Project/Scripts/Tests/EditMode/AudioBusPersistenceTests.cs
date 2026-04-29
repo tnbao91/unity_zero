@@ -1,10 +1,12 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using R3;
 using UnityEngine;
+using UnityEngine.TestTools;
 using Zero.Core;
 
 namespace Zero.Tests.EditMode
@@ -29,23 +31,21 @@ namespace Zero.Tests.EditMode
             _poolService = new StubPoolService();
         }
 
-        [Test]
-        public async UniTask SetBusVolume_PersistsToSaveService()
+        [UnityTest]
+        public IEnumerator SetBusVolume_PersistsToSaveService() => UniTask.ToCoroutine(async () =>
         {
             var service = new MockAudioServiceForTesting(
                 _logService, _assetService, _saveService, _poolService);
             await service.InitializeAsync();
 
-            // Set Master bus to 0.5
             service.SetBusVolume(AudioBus.Master, 0.5f);
 
-            // Verify saved
             Assert.IsTrue(_saveService.TryGet("audio.bus.master", out float saved));
             Assert.AreEqual(0.5f, saved, 0.01f);
-        }
+        });
 
-        [Test]
-        public async UniTask GetBusVolume_ReadsFromCache()
+        [UnityTest]
+        public IEnumerator GetBusVolume_ReadsFromCache() => UniTask.ToCoroutine(async () =>
         {
             var service = new MockAudioServiceForTesting(
                 _logService, _assetService, _saveService, _poolService);
@@ -55,28 +55,26 @@ namespace Zero.Tests.EditMode
             float retrieved = service.GetBusVolume(AudioBus.Music);
 
             Assert.AreEqual(0.7f, retrieved, 0.01f);
-        }
+        });
 
-        [Test]
-        public async UniTask SecondInstance_LoadsPersisted()
+        [UnityTest]
+        public IEnumerator SecondInstance_LoadsPersisted() => UniTask.ToCoroutine(async () =>
         {
-            // First instance: set volume
             var service1 = new MockAudioServiceForTesting(
                 _logService, _assetService, _saveService, _poolService);
             await service1.InitializeAsync();
             service1.SetBusVolume(AudioBus.Sfx, 0.3f);
 
-            // Second instance: should load persisted value
             var service2 = new MockAudioServiceForTesting(
                 _logService, _assetService, _saveService, _poolService);
             await service2.InitializeAsync();
             float retrieved = service2.GetBusVolume(AudioBus.Sfx);
 
             Assert.AreEqual(0.3f, retrieved, 0.01f);
-        }
+        });
 
-        [Test]
-        public async UniTask SetBusVolume_Clamps01()
+        [UnityTest]
+        public IEnumerator SetBusVolume_Clamps01() => UniTask.ToCoroutine(async () =>
         {
             var service = new MockAudioServiceForTesting(
                 _logService, _assetService, _saveService, _poolService);
@@ -86,7 +84,7 @@ namespace Zero.Tests.EditMode
             float retrieved = service.GetBusVolume(AudioBus.Ui);
 
             Assert.AreEqual(1f, retrieved, 0.01f);
-        }
+        });
 
         /// <summary>In-memory save service for testing (no encryption).</summary>
         private sealed class StubSaveService : ISaveService
