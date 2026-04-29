@@ -105,41 +105,42 @@ namespace Zero.Tests.EditMode
             // Just verify it doesn't throw
             Assert.Pass();
         }
-    }
 
-    /// <summary>In-memory save service for testing.</summary>
-    internal sealed class StubSaveService : ISaveService
-    {
-        private readonly Dictionary<string, object> _data = new();
-        private readonly Subject<Unit> _onLoaded = new();
-
-        public Observable<Unit> OnLoaded => _onLoaded;
-
-        public UniTask LoadAsync(CancellationToken ct = default) => UniTask.CompletedTask;
-        public UniTask SaveAsync(CancellationToken ct = default) => UniTask.CompletedTask;
-        public void RequestSave() { }
-
-        public bool TryGet<T>(string key, out T value)
+        /// <summary>Stub log service for testing.</summary>
+        private sealed class StubLogService : ILogService
         {
-            if (_data.TryGetValue(key, out var obj) && obj is T typedValue)
-            {
-                value = typedValue;
-                return true;
-            }
-            value = default;
-            return false;
+            public bool IsEnabled { get; set; } = true;
+            public void Info(string message) { }
+            public void Warn(string message) { }
+            public void Error(string message) { }
+            public void Error(Exception exception, string context = null) { }
         }
 
-        public void Set<T>(string key, T value) => _data[key] = value;
-        public void Delete(string key) => _data.Remove(key);
-    }
+        /// <summary>In-memory save service for testing.</summary>
+        private sealed class StubSaveService : ISaveService
+        {
+            private readonly Dictionary<string, object> _data = new();
+            private readonly Subject<Unit> _onLoaded = new();
 
-    /// <summary>Stub log service for testing.</summary>
-    internal sealed class StubLogService : ILogService
-    {
-        public void Info(string message) { }
-        public void Warn(string message) { }
-        public void Error(string message) { }
-        public void Fatal(string message) { }
+            public Observable<Unit> OnLoaded => _onLoaded;
+
+            public UniTask LoadAsync(CancellationToken ct = default) => UniTask.CompletedTask;
+            public UniTask SaveAsync(CancellationToken ct = default) => UniTask.CompletedTask;
+            public void RequestSave() { }
+
+            public bool TryGet<T>(string key, out T value)
+            {
+                if (_data.TryGetValue(key, out var obj) && obj is T typedValue)
+                {
+                    value = typedValue;
+                    return true;
+                }
+                value = default;
+                return false;
+            }
+
+            public void Set<T>(string key, T value) => _data[key] = value;
+            public void Delete(string key) => _data.Remove(key);
+        }
     }
 }

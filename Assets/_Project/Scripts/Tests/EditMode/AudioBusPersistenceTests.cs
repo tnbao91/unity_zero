@@ -88,6 +88,110 @@ namespace Zero.Tests.EditMode
             Assert.AreEqual(1f, retrieved, 0.01f);
         }
 
+        /// <summary>In-memory save service for testing (no encryption).</summary>
+        private sealed class StubSaveService : ISaveService
+        {
+            private readonly Dictionary<string, object> _data = new();
+            private readonly Subject<Unit> _onLoaded = new();
+
+            public Observable<Unit> OnLoaded => _onLoaded;
+
+            public UniTask LoadAsync(CancellationToken ct = default)
+            {
+                return UniTask.CompletedTask;
+            }
+
+            public UniTask SaveAsync(CancellationToken ct = default)
+            {
+                return UniTask.CompletedTask;
+            }
+
+            public void RequestSave()
+            {
+            }
+
+            public bool TryGet<T>(string key, out T value)
+            {
+                if (_data.TryGetValue(key, out var obj) && obj is T typedValue)
+                {
+                    value = typedValue;
+                    return true;
+                }
+                value = default;
+                return false;
+            }
+
+            public void Set<T>(string key, T value)
+            {
+                _data[key] = value;
+            }
+
+            public void Delete(string key)
+            {
+                _data.Remove(key);
+            }
+        }
+
+        /// <summary>Stub log service for testing.</summary>
+        private sealed class StubLogService : ILogService
+        {
+            public bool IsEnabled { get; set; } = true;
+            public void Info(string message) { }
+            public void Warn(string message) { }
+            public void Error(string message) { }
+            public void Error(Exception exception, string context = null) { }
+        }
+
+        /// <summary>Stub asset service for testing.</summary>
+        private sealed class StubAssetService : IAssetService
+        {
+            public int ActiveHandleCount => 0;
+
+            public UniTask InitializeAsync(CancellationToken ct = default)
+            {
+                return UniTask.CompletedTask;
+            }
+
+            public UniTask<IAssetHandle<T>> LoadAsync<T>(string key, CancellationToken ct = default) where T : UnityEngine.Object
+            {
+                return UniTask.FromResult<IAssetHandle<T>>(null);
+            }
+
+            public UniTask PreloadAsync(IReadOnlyList<string> keys, IProgress<float> progress = null, CancellationToken ct = default)
+            {
+                return UniTask.CompletedTask;
+            }
+        }
+
+        /// <summary>Stub pool service for testing.</summary>
+        private sealed class StubPoolService : IPoolService
+        {
+            public UniTask PrewarmAsync<T>(T prefab, int count, CancellationToken ct = default) where T : UnityEngine.Object
+            {
+                return UniTask.CompletedTask;
+            }
+
+            public IPool<T> GetPool<T>(T prefab) where T : UnityEngine.Object
+            {
+                return new StubPool<T>();
+            }
+
+            public void Clear<T>(T prefab) where T : UnityEngine.Object
+            {
+            }
+        }
+
+        /// <summary>Stub pool implementation.</summary>
+        private sealed class StubPool<T> : IPool<T> where T : UnityEngine.Object
+        {
+            public int Active => 0;
+            public int Inactive => 0;
+
+            public T Spawn(Vector3 position, Quaternion rotation) => null;
+            public T Spawn() => null;
+            public void Despawn(T instance) { }
+        }
+
         /// <summary>Minimal mock audio service using stubs (no real mixer).</summary>
         private sealed class MockAudioServiceForTesting
         {
@@ -154,98 +258,4 @@ namespace Zero.Tests.EditMode
         }
     }
 
-    /// <summary>In-memory save service for testing (no encryption).</summary>
-    internal sealed class StubSaveService : ISaveService
-    {
-        private readonly Dictionary<string, object> _data = new();
-        private readonly Subject<Unit> _onLoaded = new();
-
-        public Observable<Unit> OnLoaded => _onLoaded;
-
-        public UniTask LoadAsync(CancellationToken ct = default)
-        {
-            return UniTask.CompletedTask;
-        }
-
-        public UniTask SaveAsync(CancellationToken ct = default)
-        {
-            return UniTask.CompletedTask;
-        }
-
-        public void RequestSave()
-        {
-        }
-
-        public bool TryGet<T>(string key, out T value)
-        {
-            if (_data.TryGetValue(key, out var obj) && obj is T typedValue)
-            {
-                value = typedValue;
-                return true;
-            }
-            value = default;
-            return false;
-        }
-
-        public void Set<T>(string key, T value)
-        {
-            _data[key] = value;
-        }
-
-        public void Delete(string key)
-        {
-            _data.Remove(key);
-        }
-    }
-
-    /// <summary>Stub log service for testing.</summary>
-    internal sealed class StubLogService : ILogService
-    {
-        public void Info(string message) { }
-        public void Warn(string message) { }
-        public void Error(string message) { }
-        public void Fatal(string message) { }
-    }
-
-    /// <summary>Stub asset service for testing.</summary>
-    internal sealed class StubAssetService : IAssetService
-    {
-        public UniTask<T> LoadAsync<T>(string key, CancellationToken ct = default) where T : UnityEngine.Object
-        {
-            return UniTask.FromResult<T>(null);
-        }
-
-        public void Release<T>(T asset) where T : UnityEngine.Object
-        {
-        }
-    }
-
-    /// <summary>Stub pool service for testing.</summary>
-    internal sealed class StubPoolService : IPoolService
-    {
-        public UniTask PrewarmAsync<T>(T prefab, int count, CancellationToken ct = default) where T : UnityEngine.Object
-        {
-            return UniTask.CompletedTask;
-        }
-
-        public IPool<T> GetPool<T>(T prefab) where T : UnityEngine.Object
-        {
-            return new StubPool<T>();
-        }
-
-        public void Clear<T>(T prefab) where T : UnityEngine.Object
-        {
-        }
-    }
-
-    /// <summary>Stub pool implementation.</summary>
-    internal sealed class StubPool<T> : IPool<T> where T : UnityEngine.Object
-    {
-        public int Active => 0;
-        public int Inactive => 0;
-
-        public T Spawn(Vector3 position, Quaternion rotation) => null;
-        public T Spawn() => null;
-        public void Despawn(T instance) { }
-    }
 }
