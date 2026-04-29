@@ -164,4 +164,18 @@ Append-only log of phase implementations. One entry per phase complete.
   - **Manual checklist** (append to `docs/testing/manual-checklist.md`): loading screen progress 0→1, safe area on iOS/Android, LocalizedText on locale change, toast FIFO.
 - Resume hint: after Phase 3 merges to `main`, Phase 4 is Gameplay scaffolding (state machine, level lifecycle, domain events). Branch `phase-4-gameplay`. No UI phase further required unless consumer feeds back bugs or design feedback during their manual testing.
 
+### Round 2 patches (2026-04-30)
+
+- 8 bugs fixed across UIService, PopupHandle, ToastQueue, PopupStack (IL2CPP compat, double-dispose, raycasting, exception leaks, backdrop sort drift).
+- Commits:
+  1. `fix(ui): replace dynamic with IPopupHandle for IL2CPP compat` — IPopupHandle interface added to PopupHandle.cs; PopupHandle<TResult> implements it. UIService._activePopups changed from `Stack<(..., dynamic, ...)>` to `Stack<(..., IPopupHandle, ...)>`. PopAsync calls `handle.Cancel()` directly without `dynamic` dispatch (Bug 15).
+  2. `fix(ui): remove fictional Debug.LogDebug` — ToastQueue.cs line 102 changed `Debug.LogDebug` → `Debug.Log` (Bug 16).
+  3. `fix(ui): remove double-dispose of prefab handles` — _loadedHandles field removed; per-push `prefabHandle?.Dispose()` in finally block is the only dispose path (Bug 17).
+  4. `fix(ui): add GraphicRaycaster to backdrop Canvas` — CreateBackdrop now adds `GraphicRaycaster` component after `Canvas` to enable raycasting on override-sorting sub-canvas (Bug 18).
+  5. `fix(ui): pop _activePopups on OnOpenAsync exception` — OnOpenAsync catch block now pops both _activePopups and popup-stack to prevent leaked entries (Bug 19).
+  6. `fix(ui): clarify PopupClosed publish path in cancellation` — Added comment at PushAsync line 165 explaining PopupClosed is published by PopAsync, not re-published on handle exception (Bug 20).
+  7. `refactor(ui): use PeekNextSortOrder to avoid backdrop sort drift` — PopupStack.PeekNextSortOrder() added; UIService.CreateBackdrop call site now uses it instead of duplicating formula (Bug 21).
+  8. `refactor(ui): remove unused System.Linq` — Removed unused `using System.Linq` from UIService.cs (Bug 22).
+- Verification: compile checked by diff inspection (IL2CPP compat via interface dispatch, no more fictional APIs, no more dynamic keyword, consistent sort order formula, proper exception cleanup, no double-dispose). Asmdef references verified; all new types internal-scoped except IPopupHandle (public for interface impl). Tests remain unchanged (PopupStackTests, ToastQueueTests, UITransitionInterruptionTests expected to pass).
+
 ---

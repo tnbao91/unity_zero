@@ -270,6 +270,48 @@ For one-shot loads (e.g. SFX), wrap the play/await/cleanup in `try { ... } final
 
 For long-lived loads (e.g. mixer, current music clip), store the handle in a field and dispose it in `Dispose()` (or before re-loading the slot).
 
+### Don't use `dynamic` in Unity runtime code
+
+The C# `dynamic` keyword requires `Microsoft.CSharp.dll` and the DLR (Dynamic Language Runtime). **IL2CPP AOT does not support the DLR**, so any code that uses `dynamic` will compile fine in Editor + Mono builds, but fail at link time on iOS App Store, Android IL2CPP, and WebGL deployment.
+
+```csharp
+// WRONG — compiles, fails on device IL2CPP builds
+dynamic typedHandle = handle;
+typedHandle.Cancel();
+
+// RIGHT — use a non-generic interface and explicit type
+IPopupHandle typedHandle = handle;
+typedHandle.Cancel();
+```
+
+If you need dispatch based on a type you can't express in a generic signature, use:
+1. A non-generic interface (canonical: `IPopupHandle` with `void Cancel()`).
+2. Explicit cast `(IPopupHandle)handle` at the push site.
+3. Call the interface method directly on the stack variable.
+
+See `Assets/_Project/Scripts/Runtime/UI/PopupHandle.cs` and `UIService.PopAsync()`.
+
+### Override-sorting child Canvas needs its own GraphicRaycaster
+
+In UGUI, a child Canvas with its own `sortingOrder` (or with `overrideSorting = true`) becomes a new canvas root for raycasting hierarchy. The parent Canvas's `GraphicRaycaster` **does not raycast into** the child canvas — you must add a separate `GraphicRaycaster` to the child.
+
+```csharp
+// WRONG — backdrop Canvas has no raycaster, backdrop Image gets no taps
+var backdropGo = new GameObject(...);
+backdropGo.AddComponent<Canvas>().sortingOrder = sortOrder - 1;
+backdropGo.AddComponent<Image>().raycastTarget = true;
+// Missing: GraphicRaycaster
+
+// RIGHT
+backdropGo.AddComponent<Canvas>().sortingOrder = sortOrder - 1;
+backdropGo.AddComponent<GraphicRaycaster>();  // Enables raycasts on this canvas
+backdropGo.AddComponent<Image>().raycastTarget = true;
+```
+
+The symptom is that `IPointerClickHandler.OnPointerClick()` never fires on the backdrop despite `raycastTarget = true` and a click landing inside its Image bounds. Add the `GraphicRaycaster` to restore the raycasting chain.
+
+See `Assets/_Project/Scripts/Runtime/UI/UIService.CreateBackdrop()`.
+
 ---
 
 ## Editor-only headless test runs require an exclusive project lock
