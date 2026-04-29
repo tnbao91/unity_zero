@@ -10,7 +10,7 @@ namespace Zero.UI
     /// </summary>
     internal sealed class PopupStack
     {
-        private readonly Queue<PopupEntry> _queue = new();
+        private readonly Queue<GameObject> _queue = new();
         private readonly Stack<PopupEntry> _stack = new();
         private int _sortOrderOffset;
 

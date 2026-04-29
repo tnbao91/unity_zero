@@ -12,10 +12,7 @@ namespace Zero.UI
     {
         public static void Install(ContainerBuilder builder)
         {
-            builder.RegisterType<UIService>()
-                .As<IUIService>()
-                .Lifetime(Lifetime.Singleton)
-                .Resolution(Resolution.Lazy);
+            builder.RegisterType(typeof(UIService), new[] { typeof(IUIService) }, Lifetime.Singleton, Resolution.Lazy);
         }
     }
 }

@@ -16,7 +16,7 @@ namespace Zero.UI
         {
             canvasGroup.alpha = 0f;
             await LMotion.Create(0f, 1f, duration)
-                .BindToCanvasGroupAlpha(canvasGroup)
+                .BindToAlpha(canvasGroup)
                 .ToUniTask(cancellationToken: ct);
         }
 
@@ -24,7 +24,7 @@ namespace Zero.UI
         {
             canvasGroup.alpha = 1f;
             await LMotion.Create(1f, 0f, duration)
-                .BindToCanvasGroupAlpha(canvasGroup)
+                .BindToAlpha(canvasGroup)
                 .ToUniTask(cancellationToken: ct);
         }
 

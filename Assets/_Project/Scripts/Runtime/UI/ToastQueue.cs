@@ -5,6 +5,7 @@ using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using Zero.Core;
+using Object = UnityEngine.Object;
 
 namespace Zero.UI
 {

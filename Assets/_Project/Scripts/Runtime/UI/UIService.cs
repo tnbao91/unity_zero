@@ -6,6 +6,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using Zero.Core;
 using Zero.Core.Events;
+using Object = UnityEngine.Object;
 
 namespace Zero.UI
 {
