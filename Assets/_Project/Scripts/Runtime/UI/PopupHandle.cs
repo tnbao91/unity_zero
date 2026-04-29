@@ -18,12 +18,9 @@ namespace Zero.UI
             _completionSource.TrySetResult(result);
         }
 
-        internal void Cancel(CancellationToken ct)
+        internal void Cancel()
         {
-            if (ct.IsCancellationRequested)
-            {
-                _completionSource.TrySetCanceled();
-            }
+            _completionSource.TrySetCanceled();
         }
     }
 }

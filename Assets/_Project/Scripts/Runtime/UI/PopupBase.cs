@@ -24,6 +24,7 @@ namespace Zero.UI
     {
         [SerializeField] private PopupTransition _transition = PopupTransition.Fade;
         [SerializeField] private float _transitionDuration = 0.2f;
+        [SerializeField] private Vector2 _slideOffset = new Vector2(0, -100f);
 
         protected CanvasGroup CanvasGroup { get; private set; }
         protected PopupHandle<TResult> Handle { get; private set; }
@@ -65,7 +66,7 @@ namespace Zero.UI
                     await UITransitions.FadeIn(CanvasGroup, _transitionDuration, ct);
                     break;
                 case PopupTransition.Slide:
-                    await UITransitions.SlideIn(GetComponent<RectTransform>(), Vector2.down * 100f, _transitionDuration, ct);
+                    await UITransitions.SlideIn(GetComponent<RectTransform>(), _slideOffset, _transitionDuration, ct);
                     break;
                 case PopupTransition.Scale:
                     await UITransitions.ScaleIn(transform, _transitionDuration, ct);
@@ -84,7 +85,7 @@ namespace Zero.UI
                     await UITransitions.FadeOut(CanvasGroup, _transitionDuration, ct);
                     break;
                 case PopupTransition.Slide:
-                    await UITransitions.SlideOut(GetComponent<RectTransform>(), Vector2.down * 100f, _transitionDuration, ct);
+                    await UITransitions.SlideOut(GetComponent<RectTransform>(), _slideOffset, _transitionDuration, ct);
                     break;
                 case PopupTransition.Scale:
                     await UITransitions.ScaleOut(transform, _transitionDuration, ct);

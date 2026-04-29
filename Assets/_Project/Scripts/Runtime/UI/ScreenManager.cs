@@ -46,8 +46,8 @@ namespace Zero.UI
                 _screenLayer,
                 worldPositionStays: false);
 
-            // Allow subclass to initialize if it implements IScreenInitializable
-            if (_currentScreenInstance.TryGetComponent<IScreenInitializable<TData>>(out var screenInit))
+            // Allow subclass to initialize if it implements IScreen<T>
+            if (_currentScreenInstance.TryGetComponent<IScreen<TData>>(out var screenInit))
             {
                 await screenInit.InitializeAsync(data, ct);
             }
@@ -86,8 +86,9 @@ namespace Zero.UI
 
     /// <summary>
     /// Optional interface for screens that need custom initialization logic.
+    /// Screens can implement this interface to receive data during ShowScreenAsync.
     /// </summary>
-    public interface IScreenInitializable<in TData>
+    public interface IScreen<in TData>
     {
         UniTask InitializeAsync(TData data, CancellationToken ct = default);
     }

@@ -12,9 +12,9 @@ namespace Zero.UI
     /// </summary>
     internal static class LayerCanvas
     {
-        public static Dictionary<Core.UiLayer, Transform> Build()
+        public static void Build(IDictionary<Core.UiLayer, Transform> output)
         {
-            var result = new Dictionary<Core.UiLayer, Transform>();
+            if (output == null) throw new System.ArgumentNullException(nameof(output));
 
             // Create root container
             var root = new GameObject("[Zero.UI]")
@@ -33,19 +33,17 @@ namespace Zero.UI
             rootRect.offsetMax = Vector2.zero;
 
             // Create canvases for each layer
-            CreateLayerCanvas(root.transform, Core.UiLayer.Hud, UiLayer.HudSortOrder, result);
-            CreateLayerCanvas(root.transform, Core.UiLayer.Popup, UiLayer.PopupSortOrder, result);
-            CreateLayerCanvas(root.transform, Core.UiLayer.Overlay, UiLayer.OverlaySortOrder, result);
-            CreateLayerCanvas(root.transform, Core.UiLayer.System, UiLayer.SystemSortOrder, result);
-
-            return result;
+            CreateLayerCanvas(root.transform, Core.UiLayer.Hud, (int)Core.UiLayer.Hud, output);
+            CreateLayerCanvas(root.transform, Core.UiLayer.Popup, (int)Core.UiLayer.Popup, output);
+            CreateLayerCanvas(root.transform, Core.UiLayer.Overlay, (int)Core.UiLayer.Overlay, output);
+            CreateLayerCanvas(root.transform, Core.UiLayer.System, (int)Core.UiLayer.System, output);
         }
 
         private static void CreateLayerCanvas(
             Transform parent,
             Core.UiLayer layer,
             int sortOrder,
-            Dictionary<Core.UiLayer, Transform> result)
+            IDictionary<Core.UiLayer, Transform> output)
         {
             var canvasGo = new GameObject($"[Zero.UI.{layer}]")
             {
@@ -71,7 +69,7 @@ namespace Zero.UI
 
             canvasGo.AddComponent<GraphicRaycaster>();
 
-            result[layer] = canvasGo.transform;
+            output[layer] = canvasGo.transform;
         }
     }
 }

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.UI;
 using Zero.Core;
 using Zero.Core.Events;
 
@@ -20,9 +21,10 @@ namespace Zero.UI
         private readonly IAssetService _assetService;
         private readonly IEventBus _eventBus;
         private readonly ILogService _logService;
-        private readonly Dictionary<Core.UiLayer, Transform> _layerRoots = new();
+        private readonly Dictionary<Core.UiLayer, Transform> _layerRoots;
         private readonly Dictionary<Core.UiLayer, PopupStack> _popupStacks = new();
-        private readonly Dictionary<string, IAssetHandle> _loadedHandles = new();
+        private readonly List<IAssetHandle> _loadedHandles = new();
+        private readonly Stack<(GameObject instance, dynamic handle, string key, GameObject backdrop)> _activePopups = new();
 
         private ScreenManager _screenManager;
         private ToastQueue _toastQueue;
@@ -33,12 +35,37 @@ namespace Zero.UI
             _assetService = assetService;
             _eventBus = eventBus;
             _logService = logService;
+            _layerRoots = new Dictionary<Core.UiLayer, Transform>();
+        }
+
+        private GameObject CreateBackdrop(string popupKey, int sortOrder)
+        {
+            var backdropGo = new GameObject($"[Backdrop:{popupKey}]");
+            backdropGo.transform.SetParent(_layerRoots[Core.UiLayer.Popup], false);
+
+            var rectTransform = backdropGo.AddComponent<RectTransform>();
+            rectTransform.anchorMin = Vector2.zero;
+            rectTransform.anchorMax = Vector2.one;
+            rectTransform.offsetMin = Vector2.zero;
+            rectTransform.offsetMax = Vector2.zero;
+
+            var canvas = backdropGo.AddComponent<Canvas>();
+            canvas.sortingOrder = sortOrder - 1; // Render behind the popup
+
+            var image = backdropGo.AddComponent<Image>();
+            image.color = new Color(0, 0, 0, 0.5f); // Semi-transparent black
+            image.raycastTarget = true;
+
+            var backdropHandler = backdropGo.AddComponent<BackdropTapHandler>();
+            backdropHandler.Initialize(popupKey, _eventBus);
+
+            return backdropGo;
         }
 
         public async UniTask InitializeAsync(CancellationToken ct = default)
         {
             // Build layer canvases
-            _layerRoots = LayerCanvas.Build();
+            LayerCanvas.Build(_layerRoots);
 
             // Initialize popup stacks for each layer
             foreach (Core.UiLayer layer in System.Enum.GetValues(typeof(Core.UiLayer)))
@@ -47,7 +74,7 @@ namespace Zero.UI
             }
 
             // Initialize managers
-            _screenManager = new ScreenManager(_assetService, _layerRoots[Core.UiLayer.Popup]);
+            _screenManager = new ScreenManager(_assetService, _layerRoots[Core.UiLayer.Hud]);
             _toastQueue = new ToastQueue(_assetService, _layerRoots[Core.UiLayer.System]);
 
             await _toastQueue.InitializeAsync(ct);
@@ -75,7 +102,11 @@ namespace Zero.UI
             try
             {
                 prefabHandle = await _assetService.LoadAsync<GameObject>(prefabKey, ct);
-                _loadedHandles[popupKey] = prefabHandle;
+                _loadedHandles.Add(prefabHandle);
+
+                // Create backdrop (modal mask)
+                int popupSortOrder = (int)Core.UiLayer.Popup + _popupStacks[Core.UiLayer.Popup].Count;
+                GameObject backdrop = CreateBackdrop(popupKey, popupSortOrder);
 
                 // Instantiate the popup
                 GameObject popupInstance = Object.Instantiate(
@@ -96,6 +127,9 @@ namespace Zero.UI
                 var handle = new PopupHandle<TResult>();
                 popupComponent.SetHandle(handle);
 
+                // Track the active popup for potential cancellation (includes backdrop)
+                _activePopups.Push((popupInstance, handle, popupKey, backdrop));
+
                 // Set the sort order
                 var canvas = popupInstance.GetComponent<Canvas>();
                 if (canvas != null)
@@ -112,6 +146,7 @@ namespace Zero.UI
                 catch (OperationCanceledException)
                 {
                     Object.Destroy(popupInstance);
+                    if (backdrop != null) Object.Destroy(backdrop);
                     throw;
                 }
 
@@ -119,14 +154,30 @@ namespace Zero.UI
                 _eventBus.Publish(new PopupOpened(popupKey));
 
                 // Wait for the result
-                var result = await handle.Result;
+                TResult result = default;
+                try
+                {
+                    result = await handle.Result;
+                }
+                catch (OperationCanceledException)
+                {
+                    // Handle was cancelled externally (e.g., by PopAsync)
+                    throw;
+                }
 
                 // Close the popup
                 await popupComponent.OnCloseAsync(result, ct);
                 Object.Destroy(popupInstance);
+                if (backdrop != null) Object.Destroy(backdrop);
 
                 // Pop from stack
                 _popupStacks[Core.UiLayer.Popup].TryPop(out _);
+
+                // Remove from active popups
+                if (_activePopups.Count > 0 && _activePopups.Peek().backdrop == backdrop)
+                {
+                    _activePopups.Pop();
+                }
 
                 // Publish close event
                 _eventBus.Publish(new PopupClosed(popupKey));
@@ -140,7 +191,8 @@ namespace Zero.UI
             }
             finally
             {
-                // Don't dispose the handle yet — keep it alive for potential re-use
+                // Dispose prefab handle immediately after instantiation is done
+                prefabHandle?.Dispose();
             }
         }
 
@@ -149,9 +201,24 @@ namespace Zero.UI
             if (_disposed)
                 throw new ObjectDisposedException(nameof(UIService));
 
-            if (_popupStacks[Core.UiLayer.Popup].TryPop(out var popupInstance))
+            if (_activePopups.Count > 0)
             {
+                var (popupInstance, handle, popupKey, backdrop) = _activePopups.Pop();
+
+                // Cancel the handle to unblock the PushAsync awaiter
+                dynamic typedHandle = handle;
+                typedHandle.Cancel();
+
+                // Destroy the popup and its backdrop
                 Object.Destroy(popupInstance);
+                if (backdrop != null) Object.Destroy(backdrop);
+
+                // Pop from stack
+                _popupStacks[Core.UiLayer.Popup].TryPop(out _);
+
+                // Publish close event
+                _eventBus.Publish(new PopupClosed(popupKey));
+
                 await UniTask.Yield(cancellationToken: ct);
             }
         }
@@ -207,11 +274,14 @@ namespace Zero.UI
             _toastQueue?.Dispose();
 
             // Dispose all loaded handles
-            foreach (var handle in _loadedHandles.Values)
+            foreach (var handle in _loadedHandles)
             {
                 (handle as IDisposable)?.Dispose();
             }
             _loadedHandles.Clear();
+
+            // Clear active popups
+            _activePopups.Clear();
 
             // Clear popup stacks
             foreach (var stack in _popupStacks.Values)

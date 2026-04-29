@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using TMPro;
 using UnityEngine;
 using Zero.Core;
 
@@ -19,7 +20,7 @@ namespace Zero.UI
 
         private readonly IAssetService _assetService;
         private readonly Transform _toastLayer;
-        private readonly Queue<string> _queue = new();
+        private readonly Queue<(string text, float duration)> _queue = new();
         private IAssetHandle<GameObject> _toastPrefabHandle;
         private bool _isShowingToast;
         private bool _disposed;
@@ -59,7 +60,7 @@ namespace Zero.UI
                 _queue.Dequeue();
             }
 
-            _queue.Enqueue(text);
+            _queue.Enqueue((text, durationSeconds));
 
             if (!_isShowingToast)
             {
@@ -71,15 +72,49 @@ namespace Zero.UI
         {
             while (_queue.Count > 0 && !_disposed)
             {
-                string text = _queue.Dequeue();
+                var (text, durationSeconds) = _queue.Dequeue();
                 _isShowingToast = true;
 
-                // In a real implementation, this would instantiate the toast prefab,
-                // set the text, and wait for the duration. For now, this is a placeholder.
-                // The actual rendering is deferred to consumer who provides the toast prefab.
-                await UniTask.Delay(2000);
+                GameObject toastInstance = null;
+                try
+                {
+                    // If toast prefab is available, instantiate and display it
+                    if (_toastPrefabHandle != null)
+                    {
+                        toastInstance = Object.Instantiate(
+                            _toastPrefabHandle.Asset,
+                            _toastLayer,
+                            worldPositionStays: false);
 
-                _isShowingToast = false;
+                        // Find and set the text component
+                        var textComponent = toastInstance.GetComponentInChildren<TextMeshProUGUI>();
+                        if (textComponent != null)
+                        {
+                            textComponent.text = text;
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"[UI] Toast prefab does not have a TextMeshProUGUI component. Text will not be displayed.");
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogDebug($"[UI] Toast prefab not available. Message: {text}");
+                    }
+
+                    // Wait for the duration
+                    await UniTask.Delay(TimeSpan.FromSeconds(durationSeconds));
+
+                    // Destroy the toast instance
+                    if (toastInstance != null)
+                    {
+                        Object.Destroy(toastInstance);
+                    }
+                }
+                finally
+                {
+                    _isShowingToast = false;
+                }
             }
         }
 

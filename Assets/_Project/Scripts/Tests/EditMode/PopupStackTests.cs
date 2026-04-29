@@ -14,8 +14,8 @@ namespace Zero.Tests.EditMode
             var go1 = new GameObject("Popup1");
             var go2 = new GameObject("Popup2");
 
-            stack.Push(go1, (int)UiLayer.PopupSortOrder);
-            stack.Push(go2, (int)UiLayer.PopupSortOrder);
+            stack.Push(go1, (int)Core.UiLayer.Popup);
+            stack.Push(go2, (int)Core.UiLayer.Popup);
 
             Assert.IsTrue(stack.TryPeek(out var top));
             Assert.AreEqual(go2, top);
@@ -31,7 +31,7 @@ namespace Zero.Tests.EditMode
             var go1 = new GameObject("Popup1");
             var go2 = new GameObject("Popup2");
 
-            stack.Push(go1, (int)UiLayer.PopupSortOrder);
+            stack.Push(go1, (int)Core.UiLayer.Popup);
             stack.Push(go2, (int)UiLayer.PopupSortOrder);
 
             Assert.IsTrue(stack.TryPop(out var popped1));
@@ -51,7 +51,7 @@ namespace Zero.Tests.EditMode
             var go1 = new GameObject("Popup1");
             var go2 = new GameObject("Popup2");
 
-            stack.Push(go1, (int)UiLayer.PopupSortOrder);
+            stack.Push(go1, (int)Core.UiLayer.Popup);
             bool replaced = stack.TryReplace(go2, (int)UiLayer.PopupSortOrder, out var old);
 
             Assert.IsTrue(replaced);
