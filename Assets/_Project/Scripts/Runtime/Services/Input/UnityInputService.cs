@@ -118,8 +118,6 @@ namespace Zero.Services.Input
 
             private void HandlePointerInput()
             {
-                var mouse = Mouse.current;
-                var touch = Touchscreen.current;
                 var pointer = Pointer.current;
 
                 if (pointer == null) return;
@@ -176,7 +174,6 @@ namespace Zero.Services.Input
             private void HandleEscapeInput()
             {
                 var keyboard = Keyboard.current;
-                var androidDevice = Gamepad.current;
 
 #if UNITY_ANDROID && !UNITY_EDITOR
                 // Android back button via InputSystem
