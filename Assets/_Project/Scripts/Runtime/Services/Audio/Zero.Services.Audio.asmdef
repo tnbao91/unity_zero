@@ -8,7 +8,7 @@
         "R3",
         "Reflex",
         "LitMotion",
-        "LitMotion.Animation"
+        "LitMotion.Extensions"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
