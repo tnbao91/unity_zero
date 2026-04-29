@@ -45,6 +45,8 @@ public enum AudioBus
 
 4. **Spatial audio:** AudioSource components created by the pool support 3D positioning. Extend `PlaySfxAsync` to accept position/spatialBlend parameters.
 
+5. **Platform support:** Audio Service requires the mixer asset on all platforms and no-ops gracefully on unsupported targets.
+
 ## Examples
 
 **Playing music with auto-load and crossfade:**
@@ -73,9 +75,11 @@ Bus volumes are automatically saved via `ISaveService.Set()` on each `SetBusVolu
 
 2. **Music source is global, single:** Only one music track plays at a time. Crossfading between two simultaneous tracks requires two AudioSource components and custom blending logic.
 
-3. **SFX pool has fixed size:** Pool template is created once at init; cannot dynamically resize. If you need hundreds of simultaneous SFX, increase pool size or manage your own pool.
+3. **Music crossfade has a load gap:** `PlayMusicAsync` fades out the current track, then awaits the next clip's Addressable load, then fades in. There is a brief silent gap during clip load (typically <100ms but depends on storage). True overlapping crossfade requires a second persistent `AudioSource` and is deferred to v2.
 
-4. **No 3D falloff by default:** SFX sources spawn at world origin (no spatial). To enable 3D, modify the SFX pool template's AudioSource (set Spatial Blend > 0) and pass position to `PlaySfxAsync()`.
+4. **SFX pool has fixed size:** Pool template is created once at init; cannot dynamically resize. If you need hundreds of simultaneous SFX, increase pool size or manage your own pool.
+
+5. **No 3D falloff by default:** SFX sources spawn at world origin (no spatial). To enable 3D, modify the SFX pool template's AudioSource (set Spatial Blend > 0) and pass position to `PlaySfxAsync()`.
 
 ## Design Rationale
 
@@ -86,7 +90,7 @@ Mixer is per-game config (different games have different bus layouts). Addressab
 Mixer load is async (Addressables). Service cannot initialize in constructor. `InitializeAsync` is called by `AudioStep` during bootstrap, guaranteeing mixer is ready before any audio play.
 
 **Why LitMotion for music crossfade?**  
-LitMotion is the project's tweening standard. Volume tween bindings are built-in (`BindToAudioSourceVolume`). Avoids extra DOTween dependency.
+LitMotion is the project's tweening standard. Volume tween bindings are built-in (`BindToVolume`). Avoids extra DOTween dependency.
 
 **Why bus volumes in ISaveService, not Unity Preferences?**  
 Unified persistence layer. All game state (including audio preferences) flows through `ISaveService`, which handles encryption, serialization, and migrations. Keeps concerns separated.
