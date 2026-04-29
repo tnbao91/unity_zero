@@ -77,3 +77,36 @@ Append-only log of phase implementations. One entry per phase complete.
 - Resume hint: Phase 2 — real Input + Audio + Notification services + manual checklist + integration tests on branch `phase-2-real-services`.
 
 ---
+
+## Phase 2 — 2026-04-29 (branch `phase-2-real-services`, commits 0bbc9ce…3a82025, **awaiting Editor verification before merge**)
+
+- Branch: `phase-2-real-services` (10 commits; not yet merged to `main`)
+- Files touched:
+  - New: `Assets/_Project/Scripts/Runtime/Services/Input/UnityInputService.cs` — wraps Unity Input System + EnhancedTouch. Internal MonoBehaviour `InputDriver` polls per-frame; `DontDestroyOnLoad` guarded behind `Application.isPlaying`. Gesture thresholds: tap = down→up <200ms AND drag <20px; swipe = drag ≥50px in <500ms; drag = motion-while-pressed; pinch = two-finger active-touch distance ratio per frame.
+  - New: `Assets/_Project/Scripts/Runtime/Services/Audio/AudioMixerService.cs` — loads `audio/main_mixer` via `IAssetService` (defensive warn-and-fallback if missing), bus volumes persisted via `ISaveService` keys `audio.bus.{bus}`, music source with LitMotion `BindToVolume` fade in/out, SFX via `IPoolService.GetPool<GameObject>` template (one persistent template GO, `GetComponent<AudioSource>()` after Spawn). All `IAssetHandle<T>` are tracked + disposed.
+  - New: `Assets/_Project/Scripts/Runtime/Services/Notification/UnityMobileNotificationService.cs` — uses **Unified API** (`Unity.Notifications.NotificationCenter`) with `Initialize`, `RequestPermission` (returns `NotificationsPermissionRequest` whose `Status == NotificationsPermissionStatus.Granted` indicates grant), `ScheduleNotification`/`CancelScheduledNotification`. Permission outcome cached in `ISaveService` key `notification.permission.requested`. String → int id mapping via `_scheduledIds` Dictionary. **All `using Unity.Notifications;` and API call bodies wrapped in `#if UNITY_ANDROID || UNITY_IOS || UNITY_EDITOR`** because the Unified asmdef has `includePlatforms: ["Android","Editor","iOS"]`; without the guard, Standalone/WebGL builds break.
+  - Edit: 3 service installers wrapped real-impl bindings in `#if !ZERO_USE_MOCK_<X>` (`INPUT`/`AUDIO`/`NOTIFICATION`) so headless / Mock fallback stays available.
+  - Edit: `Bootstrap/Steps/NotificationStep.cs` — removed auto `RequestPermissionAsync`; only `InitializeAsync` runs at bootstrap. Comment points to `docs/services/notification.md` for value-moment permission flow.
+  - Edit: 3 asmdef references — `Zero.Services.Input` adds `Unity.InputSystem`; `Zero.Services.Audio` adds `LitMotion`, `LitMotion.Extensions`; `Zero.Services.Notification` adds `Unity.Notifications.Unified`. `Zero.Tests.EditMode.asmdef` updated to reference the three service asmdefs.
+  - New: 3 EditMode test files — `InputGestureTests.cs` (pure tap/swipe classification logic), `AudioBusPersistenceTests.cs` (bus persistence round-trip via in-memory `ISaveService` stub + clone of `MockAudioServiceForTesting` since real mixer can't load headless), `NotificationPersistenceTests.cs` (permission caching, schedule/cancel stubs). All stubs are `private` nested classes inside the test class to avoid namespace-level duplicate-type collisions across files.
+  - New (docs): `docs/services/{input,audio,notification}.md` (fixed format) + `docs/testing/manual-checklist.md` (per-feature device verification steps for tap/swipe/pinch, audio bus persistence, music crossfade, iOS/Android notification delivery).
+- Workflow: spawned a **Haiku junior-dev** subagent to implement, then **Opus lead** review — 17 bugs found in round 1 (P0 compile breakers + logic) and Haiku patched them in 4 commits; Opus second review found 4 more issues (asmdef ref, Status vs Granted, platform ifdef, doc drift) which Haiku patched in 3 more commits. Each round was committed incrementally so review stays auditable.
+- Production bugs the review caught (would have shipped silently otherwise):
+  1. `IAssetService.LoadAsync<T>` returns `IAssetHandle<T>`, not `T` — every call site was wrong (mixer, music clip, sfx clip).
+  2. `IPoolService.GetPool(GameObject)` returns `IPool<GameObject>`, not `IPool<AudioSource>` — type mismatch wouldn't compile.
+  3. LitMotion namespace is `LitMotion`/`LitMotion.Extensions`, not `AnnulusGames.LitMotion`. The audio extension is `BindToVolume(AudioSource)`, not `BindToAudioSourceVolume`.
+  4. `Unity.Notifications` package classes invented out of training-data familiarity — `GameNotification`/`GameNotificationRequest` don't exist; correct path is the Unified API or per-platform `iOSNotification`/`AndroidNotification`.
+  5. `NotificationsPermissionRequest.Granted` doesn't exist — actual API is `Status == NotificationsPermissionStatus.Granted`.
+  6. `Unity.Notifications.Unified.asmdef` has `includePlatforms: ["Android","Editor","iOS"]` — referencing it without ifdef guards breaks Standalone/WebGL builds.
+  7. SFX `PlaySfxAsync` had no try/finally — a cancelled `UniTask.Delay` would leak the pooled source and asset handle.
+  8. `Dispose` originally leaked the SFX template GO and both asset handles.
+  9. EditMode test files declared duplicate `internal sealed class StubSaveService`/`StubLogService` at namespace level → C# compile error. Fixed by moving stubs inside the test class as `private nested`.
+  10. Test stub `IAssetService` impl had a fictional `Release<T>` method and `LoadAsync<T>` returning `T` — must return `IAssetHandle<T>` and add `ActiveHandleCount`/`InitializeAsync`/`PreloadAsync`.
+- Verification:
+  - **Static**: every API signature in the new code re-read against actual source files in `Assets/_Project/Scripts/Runtime/Core/Interfaces/*.cs` + `Library/PackageCache/com.annulusgames.lit-motion@*` + `Library/PackageCache/com.unity.mobile.notifications@*`. Compile-clean by inspection.
+  - **Headless EditMode test run**: blocked — Unity Editor was already running on the user's machine, holding the project lock. The job started but exited before discovery.
+  - **Editor verification still owed by user** before merge: open Test Runner, run EditMode suite; open `Bootstrap.unity` Press Play, scan log for `[Bootstrap]` ordering + no exceptions.
+  - **Manual device verification (PLAN §6 Phase 2 acceptance)** still required after merge: tap/swipe/pinch on iOS/Android, audio bus persistence across restart, music crossfade, notification schedule + delivery on both platforms.
+- Resume hint: do not merge `phase-2-real-services` to `main` until user confirms (a) EditMode suite green in Test Runner and (b) Bootstrap.unity Press Play runs through to completion. After merge, Phase 3 — UI scaffolding (popup stack, transitions, loading screen, toast, localized text) on branch `phase-3-ui`.
+
+---
