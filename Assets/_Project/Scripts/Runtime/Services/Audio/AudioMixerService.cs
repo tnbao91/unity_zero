@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using AnnulusGames.LitMotion;
+using LitMotion;
+using LitMotion.Extensions;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Audio;
@@ -24,9 +25,12 @@ namespace Zero.Services.Audio
         private readonly Dictionary<AudioBus, float> _busVolumes = new();
 
         private AudioMixer _mixer;
+        private IAssetHandle<AudioMixer> _mixerHandle;
         private AudioSource _musicSource;
         private GameObject _musicSourceGo;
-        private IPool<AudioSource> _sfxPool;
+        private IAssetHandle<AudioClip> _musicHandle;
+        private IPool<GameObject> _sfxPool;
+        private GameObject _sfxTemplateGo;
         private bool _disposed;
 
         public AudioMixerService(ILogService log, IAssetService assetService, ISaveService saveService, IPoolService poolService)
@@ -42,7 +46,8 @@ namespace Zero.Services.Audio
             try
             {
                 // Load mixer from Addressables
-                _mixer = await _assetService.LoadAsync<AudioMixer>("audio/main_mixer", ct);
+                _mixerHandle = await _assetService.LoadAsync<AudioMixer>("audio/main_mixer", ct);
+                _mixer = _mixerHandle.Asset;
             }
             catch (Exception ex)
             {
@@ -84,17 +89,17 @@ namespace Zero.Services.Audio
             }
 
             // Initialize SFX pool (requires a prefab template)
-            var sfxSourceTemplate = new GameObject("[Zero.AudioSfxSource]")
+            _sfxTemplateGo = new GameObject("[Zero.AudioSfxSource]")
             {
                 hideFlags = HideFlags.HideAndDontSave
             };
             if (Application.isPlaying)
             {
-                Object.DontDestroyOnLoad(sfxSourceTemplate);
+                Object.DontDestroyOnLoad(_sfxTemplateGo);
             }
-            sfxSourceTemplate.SetActive(false);
-            sfxSourceTemplate.AddComponent<AudioSource>();
-            _sfxPool = _poolService.GetPool(sfxSourceTemplate);
+            _sfxTemplateGo.SetActive(false);
+            _sfxTemplateGo.AddComponent<AudioSource>();
+            _sfxPool = _poolService.GetPool(_sfxTemplateGo);
 
             _log.Info("[AUDIO] Initialized (mixer: " + (_mixer != null ? "loaded" : "not found") + ")");
         }
@@ -111,15 +116,18 @@ namespace Zero.Services.Audio
             if (_musicSource.isPlaying)
             {
                 await LMotion.Create(_musicSource.volume, 0f, 0.3f)
-                    .BindToAudioSourceVolume(_musicSource)
+                    .BindToVolume(_musicSource)
                     .ToUniTask(cancellationToken: ct);
             }
 
             // Load and set new clip
             try
             {
-                var clip = await _assetService.LoadAsync<AudioClip>(clipKey, ct);
-                _musicSource.clip = clip;
+                // Dispose previous music handle if any
+                _musicHandle?.Dispose();
+
+                _musicHandle = await _assetService.LoadAsync<AudioClip>(clipKey, ct);
+                _musicSource.clip = _musicHandle.Asset;
             }
             catch (Exception ex)
             {
@@ -132,7 +140,7 @@ namespace Zero.Services.Audio
 
             // Fade in new music (0.3s)
             await LMotion.Create(0f, 1f, 0.3f)
-                .BindToAudioSourceVolume(_musicSource)
+                .BindToVolume(_musicSource)
                 .ToUniTask(cancellationToken: ct);
         }
 
@@ -146,27 +154,37 @@ namespace Zero.Services.Audio
 
         public async UniTask PlaySfxAsync(string clipKey, CancellationToken ct = default)
         {
+            IAssetHandle<AudioClip> handle = null;
+            GameObject go = null;
             try
             {
-                var clip = await _assetService.LoadAsync<AudioClip>(clipKey, ct);
-                var source = _sfxPool.Spawn();
+                handle = await _assetService.LoadAsync<AudioClip>(clipKey, ct);
+                var clip = handle.Asset;
+                go = _sfxPool.Spawn();
+                var source = go.GetComponent<AudioSource>();
 
                 if (_mixer != null)
                 {
                     source.outputAudioMixerGroup = GetMixerGroup("Sfx");
                 }
 
-                source.clip = clip;
                 source.PlayOneShot(clip);
 
                 // Auto-return to pool after clip ends
                 float delaySeconds = clip.length;
                 await UniTask.Delay((int)(delaySeconds * 1000), cancellationToken: ct);
-                _sfxPool.Despawn(source);
             }
             catch (Exception ex)
             {
                 _log.Error($"[AUDIO] Failed to play SFX '{clipKey}': {ex.Message}");
+            }
+            finally
+            {
+                if (go != null)
+                {
+                    _sfxPool.Despawn(go);
+                }
+                handle?.Dispose();
             }
         }
 
@@ -222,6 +240,11 @@ namespace Zero.Services.Audio
             if (_disposed) return;
             _disposed = true;
 
+            // Dispose handles
+            _mixerHandle?.Dispose();
+            _musicHandle?.Dispose();
+
+            // Destroy music source GameObject
             if (_musicSourceGo != null)
             {
                 if (Application.isPlaying)
@@ -230,9 +253,13 @@ namespace Zero.Services.Audio
                     Object.DestroyImmediate(_musicSourceGo);
             }
 
-            if (_sfxPool != null)
+            // Destroy SFX template GameObject
+            if (_sfxTemplateGo != null)
             {
-                // Pool cleanup handled by IPoolService
+                if (Application.isPlaying)
+                    Object.Destroy(_sfxTemplateGo);
+                else
+                    Object.DestroyImmediate(_sfxTemplateGo);
             }
         }
     }
