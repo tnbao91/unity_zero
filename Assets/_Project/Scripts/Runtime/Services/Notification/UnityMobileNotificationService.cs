@@ -1,23 +1,16 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Zero.Core;
-
-#if UNITY_IOS
-using Unity.Notifications.iOS;
-#endif
-
-#if UNITY_ANDROID
-using Unity.Notifications.Android;
-#endif
+using Unity.Notifications;
 
 namespace Zero.Services.Notification
 {
     /// <summary>
-    /// Real notification service wrapping Unity Mobile Notifications package.
-    /// iOS: uses iOSNotificationCenter with permission request.
-    /// Android: uses AndroidNotificationCenter with default channel.
-    /// Editor/Other: logs and no-ops.
+    /// Real notification service wrapping Unity Mobile Notifications package (Unified API).
+    /// Cross-platform: uses NotificationCenter.ScheduleNotification + CancelScheduledNotification.
+    /// Editor/Other: logs and no-ops (API stubs handle it).
     /// Permission outcome persisted via ISaveService (key: notification.permission.requested).
     /// </summary>
     public sealed class UnityMobileNotificationService : INotificationService
@@ -25,6 +18,7 @@ namespace Zero.Services.Notification
         private readonly ILogService _log;
         private readonly ISaveService _saveService;
         private bool _permissionRequested;
+        private readonly Dictionary<string, int> _scheduledIds = new();
 
         public UnityMobileNotificationService(ILogService log, ISaveService saveService)
         {
@@ -34,23 +28,13 @@ namespace Zero.Services.Notification
 
         public async UniTask InitializeAsync(CancellationToken ct = default)
         {
-#if UNITY_ANDROID
-            // Register default notification channel on Android
-            var channel = new AndroidNotificationChannel
+            // Initialize NotificationCenter (required before any other calls)
+            var args = new NotificationCenterArgs()
             {
-                Id = "default",
-                Name = "Default",
-                Description = "Generic notifications",
-                Importance = Importance.Default,
-                CanBypassDnd = false,
+                AndroidChannelId = "default",
+                PresentationOptions = NotificationPresentation.Alert | NotificationPresentation.Badge | NotificationPresentation.Sound,
             };
-            AndroidNotificationCenter.RegisterNotificationChannel(channel);
-            _log.Info("[NOTIF] Android channel 'default' registered");
-#elif UNITY_IOS
-            _log.Info("[NOTIF] iOS notification center initialized");
-#else
-            _log.Info("[NOTIF] Notifications not supported on this platform");
-#endif
+            NotificationCenter.Initialize(args);
 
             // Load persisted permission state
             if (_saveService.TryGet("notification.permission.requested", out bool requested))
@@ -58,6 +42,7 @@ namespace Zero.Services.Notification
                 _permissionRequested = requested;
             }
 
+            _log.Info("[NOTIF] Initialized (unified cross-platform API)");
             await UniTask.CompletedTask;
         }
 
@@ -70,95 +55,81 @@ namespace Zero.Services.Notification
                 return true;
             }
 
-#if UNITY_IOS
-            var request = new GameNotificationRequest()
-            {
-                Identifier = 0,
-                Title = "",
-                Text = "",
-                FireTime = System.DateTime.Now.AddSeconds(1),
-            };
-
             try
             {
-                iOSNotificationCenter.SendNotification(request, "default");
-                _log.Info("[NOTIF] iOS permission requested");
-                _permissionRequested = true;
-                _saveService.Set("notification.permission.requested", true);
-                return true;
+                var permissionRequest = NotificationCenter.RequestPermission();
+                await permissionRequest.ToUniTask(cancellationToken: ct);
+
+                _permissionRequested = permissionRequest.Granted;
+                _saveService.Set("notification.permission.requested", _permissionRequested);
+                _log.Info($"[NOTIF] Permission request completed (granted: {_permissionRequested})");
+                return _permissionRequested;
             }
             catch (Exception ex)
             {
-                _log.Error($"[NOTIF] iOS permission request failed: {ex.Message}");
+                _log.Error($"[NOTIF] Permission request failed: {ex.Message}");
                 return false;
             }
-#elif UNITY_ANDROID
-            _log.Info("[NOTIF] Android notifications auto-permitted");
-            _permissionRequested = true;
-            _saveService.Set("notification.permission.requested", true);
-            return true;
-#else
-            _log.Info("[NOTIF] Permission request no-op on non-mobile platform");
-            _permissionRequested = true;
-            _saveService.Set("notification.permission.requested", true);
-            return true;
-#endif
         }
 
         public void Schedule(string id, string title, string body, TimeSpan delay)
         {
-#if UNITY_IOS
-            var notification = new GameNotification
+            try
             {
-                Identifier = int.TryParse(id, out int numId) ? numId : id.GetHashCode(),
-                Title = title,
-                Body = body,
-                FireTime = System.DateTime.Now.Add(delay),
-            };
-            iOSNotificationCenter.SendNotification(notification, "default");
-            _log.Info($"[NOTIF:iOS] Scheduled '{id}' in {delay.TotalSeconds:F0}s");
-#elif UNITY_ANDROID
-            var notification = new AndroidNotification
+                var notification = new Notification
+                {
+                    Title = title,
+                    Text = body,
+                    Data = id,
+                };
+
+                var schedule = new NotificationIntervalSchedule(delay, repeats: false);
+                int numericId = NotificationCenter.ScheduleNotification(notification, schedule);
+
+                // Cache the mapping so we can cancel by string id later
+                _scheduledIds[id] = numericId;
+
+                _log.Info($"[NOTIF] Scheduled '{id}' in {delay.TotalSeconds:F0}s (native id: {numericId})");
+            }
+            catch (Exception ex)
             {
-                Title = title,
-                Text = body,
-                FireTime = System.DateTime.Now.Add(delay),
-                IntentData = id,
-            };
-            AndroidNotificationCenter.SendNotification(notification, "default");
-            _log.Info($"[NOTIF:Android] Scheduled '{id}' in {delay.TotalSeconds:F0}s");
-#else
-            _log.Info($"[NOTIF] Schedule no-op on non-mobile: '{id}' (title: {title}, delay: {delay.TotalSeconds:F0}s)");
-#endif
+                _log.Error($"[NOTIF] Schedule failed for '{id}': {ex.Message}");
+            }
         }
 
         public void Cancel(string id)
         {
-#if UNITY_IOS
-            if (int.TryParse(id, out int numId))
+            try
             {
-                iOSNotificationCenter.RemoveNotification(numId);
-                _log.Info($"[NOTIF:iOS] Cancelled '{id}'");
+                if (_scheduledIds.TryGetValue(id, out int numericId))
+                {
+                    NotificationCenter.CancelScheduledNotification(numericId);
+                    _scheduledIds.Remove(id);
+                    _log.Info($"[NOTIF] Cancelled '{id}' (native id: {numericId})");
+                }
+                else
+                {
+                    _log.Warn($"[NOTIF] Cancel called for unknown id '{id}'");
+                }
             }
-#elif UNITY_ANDROID
-            AndroidNotificationCenter.CancelNotification(id);
-            _log.Info($"[NOTIF:Android] Cancelled '{id}'");
-#else
-            _log.Info($"[NOTIF] Cancel no-op on non-mobile: '{id}'");
-#endif
+            catch (Exception ex)
+            {
+                _log.Error($"[NOTIF] Cancel failed for '{id}': {ex.Message}");
+            }
         }
 
         public void CancelAll()
         {
-#if UNITY_IOS
-            iOSNotificationCenter.ClearNotifications();
-            _log.Info("[NOTIF:iOS] All notifications cancelled");
-#elif UNITY_ANDROID
-            AndroidNotificationCenter.CancelAllNotifications();
-            _log.Info("[NOTIF:Android] All notifications cancelled");
-#else
-            _log.Info("[NOTIF] CancelAll no-op on non-mobile");
-#endif
+            try
+            {
+                NotificationCenter.CancelAllScheduledNotifications();
+                _scheduledIds.Clear();
+                _log.Info("[NOTIF] All notifications cancelled");
+            }
+            catch (Exception ex)
+            {
+                _log.Error($"[NOTIF] CancelAll failed: {ex.Message}");
+            }
         }
     }
 }

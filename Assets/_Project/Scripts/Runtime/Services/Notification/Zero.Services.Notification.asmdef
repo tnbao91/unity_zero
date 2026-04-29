@@ -6,7 +6,7 @@
         "Zero.Infrastructure",
         "UniTask",
         "Reflex",
-        "Unity.Notifications"
+        "Unity.Notifications.Unified"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
