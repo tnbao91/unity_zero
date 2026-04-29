@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using NUnit.Framework;
+using R3;
+using UnityEngine;
 using Zero.Core;
 
 namespace Zero.Tests.EditMode
@@ -156,9 +158,9 @@ namespace Zero.Tests.EditMode
     internal sealed class StubSaveService : ISaveService
     {
         private readonly Dictionary<string, object> _data = new();
-        private readonly Subject<R3.Unit> _onLoaded = new();
+        private readonly Subject<Unit> _onLoaded = new();
 
-        public R3.Observable<R3.Unit> OnLoaded => _onLoaded;
+        public Observable<Unit> OnLoaded => _onLoaded;
 
         public UniTask LoadAsync(CancellationToken ct = default)
         {
