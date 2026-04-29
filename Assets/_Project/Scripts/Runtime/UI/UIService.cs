@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -23,8 +22,7 @@ namespace Zero.UI
         private readonly ILogService _logService;
         private readonly Dictionary<Core.UiLayer, Transform> _layerRoots;
         private readonly Dictionary<Core.UiLayer, PopupStack> _popupStacks = new();
-        private readonly List<IAssetHandle> _loadedHandles = new();
-        private readonly Stack<(GameObject instance, dynamic handle, string key, GameObject backdrop)> _activePopups = new();
+        private readonly Stack<(GameObject instance, IPopupHandle handle, string key, GameObject backdrop)> _activePopups = new();
 
         private ScreenManager _screenManager;
         private ToastQueue _toastQueue;
@@ -51,6 +49,9 @@ namespace Zero.UI
 
             var canvas = backdropGo.AddComponent<Canvas>();
             canvas.sortingOrder = sortOrder - 1; // Render behind the popup
+
+            // GraphicRaycaster needed for UGUI raycasting on override-sorting sub-canvas
+            backdropGo.AddComponent<GraphicRaycaster>();
 
             var image = backdropGo.AddComponent<Image>();
             image.color = new Color(0, 0, 0, 0.5f); // Semi-transparent black
@@ -102,10 +103,10 @@ namespace Zero.UI
             try
             {
                 prefabHandle = await _assetService.LoadAsync<GameObject>(prefabKey, ct);
-                _loadedHandles.Add(prefabHandle);
 
                 // Create backdrop (modal mask)
-                int popupSortOrder = (int)Core.UiLayer.Popup + _popupStacks[Core.UiLayer.Popup].Count;
+                // Use PeekNextSortOrder to avoid duplicating the PopupStack formula
+                int popupSortOrder = _popupStacks[Core.UiLayer.Popup].PeekNextSortOrder((int)Core.UiLayer.Popup);
                 GameObject backdrop = CreateBackdrop(popupKey, popupSortOrder);
 
                 // Instantiate the popup
@@ -128,7 +129,7 @@ namespace Zero.UI
                 popupComponent.SetHandle(handle);
 
                 // Track the active popup for potential cancellation (includes backdrop)
-                _activePopups.Push((popupInstance, handle, popupKey, backdrop));
+                _activePopups.Push((popupInstance, (IPopupHandle)handle, popupKey, backdrop));
 
                 // Set the sort order
                 var canvas = popupInstance.GetComponent<Canvas>();
@@ -147,6 +148,8 @@ namespace Zero.UI
                 {
                     Object.Destroy(popupInstance);
                     if (backdrop != null) Object.Destroy(backdrop);
+                    if (_activePopups.Count > 0) _activePopups.Pop();
+                    _popupStacks[Core.UiLayer.Popup].TryPop(out _);
                     throw;
                 }
 
@@ -161,7 +164,8 @@ namespace Zero.UI
                 }
                 catch (OperationCanceledException)
                 {
-                    // Handle was cancelled externally (e.g., by PopAsync)
+                    // Handle was cancelled externally (e.g., by PopAsync).
+                    // PopupClosed is published by PopAsync before calling Cancel(); we don't republish here.
                     throw;
                 }
 
@@ -206,8 +210,7 @@ namespace Zero.UI
                 var (popupInstance, handle, popupKey, backdrop) = _activePopups.Pop();
 
                 // Cancel the handle to unblock the PushAsync awaiter
-                dynamic typedHandle = handle;
-                typedHandle.Cancel();
+                handle.Cancel();
 
                 // Destroy the popup and its backdrop
                 Object.Destroy(popupInstance);
@@ -272,13 +275,6 @@ namespace Zero.UI
             _screenManager?.Dispose();
 
             _toastQueue?.Dispose();
-
-            // Dispose all loaded handles
-            foreach (var handle in _loadedHandles)
-            {
-                (handle as IDisposable)?.Dispose();
-            }
-            _loadedHandles.Clear();
 
             // Clear active popups
             _activePopups.Clear();
