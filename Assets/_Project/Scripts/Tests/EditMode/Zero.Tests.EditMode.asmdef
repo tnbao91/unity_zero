@@ -10,6 +10,9 @@
         "Zero.Services.Pool",
         "Zero.Services.Events",
         "Zero.Services.Log",
+        "Zero.Services.Audio",
+        "Zero.Services.Notification",
+        "Zero.Services.Input",
         "Zero.Bootstrap",
         "UniTask",
         "Reflex"

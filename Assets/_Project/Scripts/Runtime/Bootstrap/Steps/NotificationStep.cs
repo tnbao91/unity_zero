@@ -20,8 +20,9 @@ namespace Zero.Bootstrap.Steps
 
         protected override async UniTask OnExecuteAsync(IProgress<float> progress, CancellationToken ct)
         {
+            // Initialize only. Permission request deferred to value moment (e.g., after first level).
+            // See docs/services/notification.md for explanation.
             await _service.InitializeAsync(ct);
-            await _service.RequestPermissionAsync(ct);
         }
     }
 }

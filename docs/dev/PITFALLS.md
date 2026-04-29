@@ -211,6 +211,75 @@ When you find drift, fix the doc same commit — don't defer.
 
 ---
 
+## Wrapping third-party / Unity packages
+
+When you add a new service that wraps a Unity package, a NuGet DLL, or any external SDK, the most expensive bug class is **inventing API shapes from training data instead of reading the actual code**. Phase 2 surfaced this repeatedly. Before writing the wrapper:
+
+### Read the package source — don't guess class or method names
+
+LitMotion lives in `Library/PackageCache/com.annulusgames.lit-motion@*/Runtime/`. The namespace is `LitMotion` (core) and `LitMotion.Extensions` (per-component bindings). The audio-volume extension is `BindToVolume(this MotionBuilder<...>, AudioSource)` — not `BindToAudioSourceVolume`. Inventing the latter gives a CS1061 that AI-flavored fix loops keep failing on because the right name was never in scope.
+
+Unity Mobile Notifications has three asmdefs — `Unity.Notifications.iOS`, `Unity.Notifications.Android`, and the cross-platform `Unity.Notifications.Unified` (preferred). The Unified API exposes `NotificationCenter.Initialize/RequestPermission/ScheduleNotification/CancelScheduledNotification`, the `Notification` struct, and `NotificationsPermissionRequest` whose grant signal is `Status == NotificationsPermissionStatus.Granted` — there is no `Granted` bool property despite that being the obvious name. Read `Library/PackageCache/com.unity.mobile.notifications@*/Runtime/Unified/*.cs` before writing the wrapper, even if you "know" the API.
+
+### asmdef references that don't exist silently break the build
+
+`"LitMotion.Animation"` is not a real asmdef. `"Unity.Notifications"` is not a real asmdef. Both names look plausible; both produce missing-reference diagnostics that are easy to miss in a wall of compile errors. Always cross-check the `references` array against the asmdef files actually present under `Library/PackageCache/<package>/`.
+
+### Check `includePlatforms` on packages you reference
+
+`Unity.Notifications.Unified.asmdef` has `includePlatforms: ["Android", "Editor", "iOS"]`. Any consumer asmdef that references it is fine to compile in Editor and on those targets, but on Standalone / WebGL the reference drops and `using Unity.Notifications;` fails to resolve. Two options:
+
+1. (Preferred for mobile-only template services) Wrap the `using` and every API call body in `#if UNITY_ANDROID || UNITY_IOS || UNITY_EDITOR`, with a no-op `#else` branch that logs and returns safe defaults. The asmdef ref stays in place; Unity ignores it on excluded platforms.
+2. Mirror the `includePlatforms` constraint on your wrapper asmdef. Only do this if the entire service can disappear on those platforms — usually it can't, because bootstrap/DI still resolves the binding.
+
+`UnityMobileNotificationService.cs` is the canonical example of option 1.
+
+### Invented constructor parameters cause Reflex `UnknownContractException` at first resolve
+
+If you write a wrapper with a plausible-looking ctor like `public Foo(ILogService log, string defaultId = "x")`, Reflex picks the longest ctor and tries to resolve `string` from the container — which is never bound. Either keep a single ctor with no primitives, or wrap the primitive in a typed config object (`FooConfig`) and bind that. Already covered in "Reflex DI"; mentioned here because it bites every new wrapper you write.
+
+### Cross-check API signatures of injected interfaces before assuming a return shape
+
+`IAssetService.LoadAsync<T>` returns `UniTask<IAssetHandle<T>>`, not `UniTask<T>`. The handle exposes `T Asset { get; }` plus `IDisposable`. Code that writes `T x = await _assetService.LoadAsync<T>(key, ct);` looks idiomatic and will compile against a wrong assumption — except it won't, because the type doesn't match. The same trap exists for `IPoolService.GetPool<T>(T prefab)`: pass a `GameObject` template and you get `IPool<GameObject>`, not `IPool<AudioSource>`. AudioSource has to be fetched via `GetComponent` after `Spawn()`. Confusing the return type was Phase 2's most-repeated bug.
+
+The remedy is the same as the documentation-discipline rule above: open the interface file in `Assets/_Project/Scripts/Runtime/Core/Interfaces/` and read the actual signature. AI assistants generating Service-shaped wrappers from familiarity with similar APIs (Addressables.LoadAssetAsync<T> returning T, Unity Pool returning the prefab type) will reach for the wrong shape almost every time.
+
+### Addressables logs the red exception BEFORE your try/catch sees it
+
+`Addressables.LoadAssetAsync<T>(key)` calls `Debug.LogError` itself when a key isn't registered, then throws `InvalidKeyException`. By the time your `catch` block converts the exception into a friendly warn, the red entry is already in the console. Fresh-clone Bootstrap then looks broken to anyone reading the log — even though the service falls back correctly.
+
+Fix on the consumer side: pre-check key existence with `IAssetService.HasKeyAsync<T>(key, ct)` (backed by `Addressables.LoadResourceLocationsAsync`, which never throws — it returns an empty result list). Only call `LoadAsync` when the pre-check is true. `AudioMixerService.InitializeAsync` is the canonical example.
+
+The same trap applies to any future service that loads optional content via Addressables. Always pre-check; don't rely on try/catch alone.
+
+### Type-name collisions across `using` directives produce silent miscompiles
+
+The runtime asmdefs pull in `R3`, `UnityEngine`, `UnityEngine.InputSystem`, `Unity.Notifications`, etc. Several short type names collide:
+
+- `Touch` exists in both `UnityEngine` (legacy input) and `UnityEngine.InputSystem.EnhancedTouch`. With both `using` directives present, `new Touch[0]` is CS0104 ambiguous. Fully-qualify (`new UnityEngine.InputSystem.EnhancedTouch.Touch[0]`).
+- `Notification` exists in both `R3` and `Unity.Notifications`. With R3 in scope (the project default for almost every asmdef), `new Notification { ... }` resolves to the wrong type. Fully-qualify (`new Unity.Notifications.Notification { ... }`) or alias.
+- `Object` resolves to `System.Object` when only `using System;` is in scope, but Unity-side calls expect `UnityEngine.Object` (e.g. `Object.Destroy`). Add `using Object = UnityEngine.Object;` at the top of files that mix Unity destruction APIs with `System.Object`-aware code.
+
+Generated wrappers around Unity packages are especially prone to all three because the AI generating them doesn't simulate the full set of `using` directives that the asmdef's references will introduce. Spot-check after each new wrapper.
+
+### Disposable handles must be tracked, not fire-and-forget
+
+`IAssetHandle<T>` is the project's reference-counting contract. Every `LoadAsync` call increments the handle count; the `IAssetService` only releases when you `Dispose` the handle. A long-lived service that loads a clip per call without disposing leaks ref counts and pins assets in memory.
+
+For one-shot loads (e.g. SFX), wrap the play/await/cleanup in `try { ... } finally { handle?.Dispose(); pool.Despawn(go); }` — `OperationCanceledException` from a UniTask token will skip the despawn / dispose otherwise.
+
+For long-lived loads (e.g. mixer, current music clip), store the handle in a field and dispose it in `Dispose()` (or before re-loading the slot).
+
+---
+
+## Editor-only headless test runs require an exclusive project lock
+
+`Unity -batchmode ... -runTests` cannot open the project if Unity Editor is already running on it. The CLI exits without writing the result XML. There is no friendly error — you just see the launcher log up to "Successfully changed project path" and then nothing. Close the Editor before running CI-like commands, or rely on Test Runner from inside the open Editor.
+
+CI doesn't hit this because `game-ci/unity-test-runner` provisions a fresh Unity in its own container. Local headless runs need either a closed Editor or a separate project clone.
+
+---
+
 ## Phase workflow
 
 `docs/dev/PLAN.md` is the source of truth for what should happen; `docs/dev/JOURNAL.md` is the append-only record of what actually shipped each phase. After every phase:

@@ -72,6 +72,21 @@ namespace Zero.Services.Asset
             return new TypedHandle<T>(scoped, op);
         }
 
+        public async UniTask<bool> HasKeyAsync<T>(string key, CancellationToken ct = default) where T : UnityEngine.Object
+        {
+            // Resolves to empty list if no entry — never throws InvalidKeyException.
+            var op = Addressables.LoadResourceLocationsAsync(key, typeof(T));
+            try
+            {
+                await op.ToUniTask(cancellationToken: ct);
+                return op.Status == AsyncOperationStatus.Succeeded && op.Result != null && op.Result.Count > 0;
+            }
+            finally
+            {
+                if (op.IsValid()) Addressables.Release(op);
+            }
+        }
+
         public async UniTask PreloadAsync(IReadOnlyList<string> keys, IProgress<float> progress = null, CancellationToken ct = default)
         {
             if (keys == null || keys.Count == 0) return;

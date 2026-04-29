@@ -6,7 +6,8 @@
         "Zero.Infrastructure",
         "UniTask",
         "R3",
-        "Reflex"
+        "Reflex",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
