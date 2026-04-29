@@ -90,7 +90,7 @@ namespace Zero.Services.Notification
 #if UNITY_ANDROID || UNITY_IOS || UNITY_EDITOR
             try
             {
-                var notification = new Notification
+                var notification = new Unity.Notifications.Notification
                 {
                     Title = title,
                     Text = body,

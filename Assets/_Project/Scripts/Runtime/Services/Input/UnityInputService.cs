@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.EnhancedTouch;
 using Zero.Core;
+using Object = UnityEngine.Object;
 
 namespace Zero.Services.Input
 {
@@ -94,12 +95,12 @@ namespace Zero.Services.Input
             private Vector2 _pointerDownPos;
             private float _pointerDownTime;
             private Vector2 _lastPointerPos;
-            private Touch[] _previousTouches;
+            private UnityEngine.InputSystem.EnhancedTouch.Touch[] _previousTouches;
 
             public void Initialize(UnityInputService service)
             {
                 _service = service;
-                _previousTouches = new Touch[0];
+                _previousTouches = new UnityEngine.InputSystem.EnhancedTouch.Touch[0];
             }
 
             public void Shutdown()
@@ -196,7 +197,7 @@ namespace Zero.Services.Input
 
                 if (activeTouches.Count < 2)
                 {
-                    _previousTouches = new Touch[0];
+                    _previousTouches = new UnityEngine.InputSystem.EnhancedTouch.Touch[0];
                     return;
                 }
 
