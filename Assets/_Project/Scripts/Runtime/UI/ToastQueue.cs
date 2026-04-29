@@ -99,7 +99,7 @@ namespace Zero.UI
                     }
                     else
                     {
-                        Debug.LogDebug($"[UI] Toast prefab not available. Message: {text}");
+                        Debug.Log($"[UI] Toast prefab not available. Message: {text}");
                     }
 
                     // Wait for the duration
