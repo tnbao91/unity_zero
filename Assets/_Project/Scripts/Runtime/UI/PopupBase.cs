@@ -28,7 +28,7 @@ namespace Zero.UI
 
         protected CanvasGroup CanvasGroup { get; private set; }
         protected PopupHandle<TResult> Handle { get; private set; }
-        protected TData CurrentData { get; protected set; }
+        protected TData CurrentData { get; private set; }
 
         protected virtual void Awake()
         {

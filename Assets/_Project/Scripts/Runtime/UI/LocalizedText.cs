@@ -1,3 +1,5 @@
+using System;
+using R3;
 using Reflex.Attributes;
 using TMPro;
 using UnityEngine;
@@ -18,7 +20,7 @@ namespace Zero.UI
         [Inject] private IL10nService _localizationService;
 
         private TextMeshProUGUI _text;
-        private R3.IDisposable _localeSubscription;
+        private IDisposable _localeSubscription;
 
         private void OnEnable()
         {

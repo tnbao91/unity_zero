@@ -1,3 +1,5 @@
+using System;
+using R3;
 using Reflex.Attributes;
 using TMPro;
 using UnityEngine;
@@ -18,8 +20,8 @@ namespace Zero.UI
 
         [Inject] private IBootstrapProgressReporter _reporter;
 
-        private R3.IDisposable _progressSubscription;
-        private R3.IDisposable _stepNameSubscription;
+        private IDisposable _progressSubscription;
+        private IDisposable _stepNameSubscription;
 
         private void Start()
         {
