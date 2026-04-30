@@ -262,7 +262,25 @@ User direction: framework should not init UI in code. Consumer authors UI hierar
   12. **Round 2 (CS1998 warnings):** `CheckAsync` was `async UniTask<...>` with no real await — synchronous compute path. Removed `async`, wrapped each return with `UniTask.FromResult`. Test cancellation lambda `async () => await _service.CheckAsync(...)` had no real outer await; switched to `() => _service.CheckAsync(...).AsTask()` + trailing `await UniTask.CompletedTask;`.
   13. **Round 3 (test runtime failure):** ForceUpdate / SoftUpdate tests asserted ForceUpdate/SoftUpdate but got Ok. Cause: service used `Application.version` directly; default template ProductVersion is "0.1" (2-part) which fails 3-part semver parse → warn + Ok regardless of remote min_version. Fix: ctor takes `string localVersion`; production binding via `RegisterFactory` supplies `Application.version`; tests inject `"1.0.0"`.
 - Verification: console clean, Test Runner green (16 new + 39 prior = 55 EditMode cases). User confirmed.
-- Resume hint: Phase 5b is docs-only — `README.md`, `README.vi.md`, `LICENSE` (MIT), `CONTRIBUTING.md`, `CHANGELOG.md`, `docs/architecture/asmdef-graph.md` (final DAG), 6 service+liveops+devtools docs (`docs/services/version-check.md`, `docs/services/time.md`, `docs/liveops/version-check.md`, `docs/liveops/addressables-remote.md`, `docs/dev/cheat-console.md`, `docs/dev/fps-overlay.md`), 8 Mock SDK extension recipes (Crashlytics, Consent, RemoteConfig, Analytics, Attribution, Ads, IAP, ReceiptValidator), `docs/meta/recipes.md`. Branch `phase-5b-docs`.
+- Resume hint: Phase 5b is docs-only.
+
+---
+
+## Phase 5b — 2026-04-30 (merged to `main`) — TEMPLATE COMPLETE
+
+- Branch: `phase-5b-docs` (3 commits)
+- Files created (21 total):
+  - **Repo-level (5):** `README.md` (rewritten — stack table, ASCII architecture diagram, 7-step Quick Start incl. ZeroSecrets.asset setup, phase status table, full doc index), `README.vi.md` (Vietnamese pitch + Quick Start per PLAN §7 #9), `LICENSE` (MIT, copyright 2026 Bao Tran), `CONTRIBUTING.md` (service-add recipe, mock SDK extension flow, test conventions, phase workflow, conventional-commit style), `CHANGELOG.md` (Unreleased v0 section grouped by phase).
+  - **Architecture (1):** `docs/architecture/asmdef-graph.md` — Mermaid DAG of all 28 runtime asmdefs + 2 test asmdefs, tier breakdown (Core / Infra / Services / Peers / Composition root / Aux DevTools), extension recipe.
+  - **Service docs (2):** `docs/services/version-check.md` (factory binding rationale, semver edge cases, status routing), `docs/services/time.md` (stub-only template default + server/NTP extension recipe).
+  - **Live-Ops (2):** `docs/liveops/version-check.md` (consumer LiveOpsGate pattern, soft-update friction levels, re-check on app foreground), `docs/liveops/addressables-remote.md` (CDN setup, RemoteLoadPath config, content update flow — consumer-supplied CDN, no hardcoded URL).
+  - **DevTools (2):** `docs/dev/cheat-console.md` (built-in commands, custom-command recipe, save-reset override pattern), `docs/dev/fps-overlay.md` (F2 toggle, what it shows, extension hooks for battery/thermal).
+  - **Mock SDK extension recipes (8):** `docs/services/{crashlytics,consent,remote-config,analytics,attribution,ads,iap,receipt-validator}.md`. Each: fixed-format Overview / Public API / Mock behavior / Extension Points (with installer-line swap to Firebase / Google UMP / AppLovin / Unity IAP / etc.) / Examples / Known Limitations / Design Rationale.
+  - **Meta recipes (1):** `docs/meta/recipes.md` — pseudo-code patterns for wallet, progression, reward grant, daily login, A/B variants, plus a per-game `MetaInstaller` wiring example. Per PLAN §2.4 no impl ships.
+- Workflow: spawned a Haiku junior subagent first; Haiku hit the model rate limit before writing any file. Switched to writing in main session directly (lower risk for prose-only work; reviewer skim covers fact-checking).
+- Verification: every interface signature, installer file path, and SDK API name in the docs was cross-checked against the actual source under `Assets/_Project/Scripts/Runtime/Core/Interfaces/` and `Library/PackageCache/`. Mock + interface shapes verified for all 8 SDK recipes.
+- Things to watch: SDK-specific API examples (Firebase / AppLovin / Unity IAP) are written from documentation knowledge, not in-repo source — those vendors update APIs frequently. Treat the recipe code as a starting point; consumers should re-verify against current SDK docs when they actually wire a real adapter.
+- Resume hint: **template is complete.** All five build phases (1a / 1b / 2 / 3 / 4 / 5a / 5b) are merged to `main`. `docs/dev/PLAN.md` §3 has no Phase 6. Future work is consumer fork (per-game meta, real SDK adapters, genre-specific gameplay) — not template work.
 
 ### Phase 4 round 2 — Editor compile fixes
 
