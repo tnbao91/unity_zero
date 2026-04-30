@@ -16,6 +16,12 @@ namespace Zero.Gameplay
                 new[] { typeof(IGameStateMachine) },
                 Lifetime.Singleton,
                 Resolution.Lazy);
+
+            builder.RegisterType(
+                typeof(LevelLoader),
+                new[] { typeof(LevelLoader) },
+                Lifetime.Singleton,
+                Resolution.Lazy);
         }
     }
 }
