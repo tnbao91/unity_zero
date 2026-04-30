@@ -15,6 +15,7 @@
         "Zero.Services.Input",
         "Zero.Services.Localization",
         "Zero.UI",
+        "Zero.Gameplay",
         "Zero.Bootstrap",
         "UniTask",
         "R3",

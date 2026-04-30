@@ -128,6 +128,10 @@ Unity's Test Runner only enumerates EditMode test asmdefs that have `includePlat
 
 `Assets/Resources/ZeroSecrets.asset.example` references `ZeroSecrets.cs` by GUID. If `ZeroSecrets.cs.meta` isn't tracked in git, Unity generates a fresh random GUID on first import and the example asset's script reference dangles. The repo pre-commits `ZeroSecrets.cs.meta` with a deterministic GUID. Apply the same pattern any time you ship a sample/template `.asset` that binds to a script.
 
+### `Observable<T>.Subscribe(Action<T>)` requires `using R3;` at the call site
+
+`R3.Observable<T>` only declares `Subscribe(Observer<T>)` as a class member. `Subscribe(Action<T> onNext)` is an **extension method** in the `R3` namespace. A test file that uses `bus.On<TEvent>().Subscribe(evt => ...)` without `using R3;` compiles to the `Observer<T>` overload and emits `CS1660: Cannot convert lambda expression to type 'Observer<T>' because it is not a delegate type`. This bit Phase 4 round 2 in two test files. Always add `using R3;` to any file that subscribes via lambda — even if the file doesn't otherwise reference R3 types directly (the extension lookup still needs the namespace in scope).
+
 ---
 
 ## Reflex DI
