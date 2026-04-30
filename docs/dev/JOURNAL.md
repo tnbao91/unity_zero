@@ -231,7 +231,38 @@ User direction: framework should not init UI in code. Consumer authors UI hierar
   - **Static**: every API signature in the new code re-read against actual source files in `Assets/_Project/Scripts/Runtime/Core/Interfaces/*.cs` (IAssetService, IEventBus) and existing installers (`EventsServiceInstaller`, `AudioServiceInstaller`) for Reflex registration shape. Compile-clean by inspection.
   - **Headless EditMode test run**: not attempted — user's Editor was running on prior phases too. User to run via Test Runner before merge.
   - **`.meta` files**: not generated yet for new `.cs`/`.asmdef` files (Unity creates on next Editor open). User commits resulting metas after first Editor open. Same situation as Phase 3 (UIRoot.cs.meta was committed post-merge).
-- Resume hint: Phase 4 merged after user-side Editor verification (console clean, Test Runner green). Next phase: Phase 5 — Live-ops + DevTools + cross-cutting docs, branch `phase-5-liveops-devtools`. Phase 5 is the final phase per PLAN §3; meta layer remains out of scope per §2.4.
+- Resume hint: Phase 4 merged after user-side Editor verification (console clean, Test Runner green). Next: Phase 5 split into 5a (runtime + tests) and 5b (docs).
+
+---
+
+## Phase 5a — 2026-04-30 (merged to `main`)
+
+- Branch: `phase-5a-liveops-devtools` (8 commits)
+- Files touched:
+  - Runtime VersionCheck: `IVersionCheckService.cs` (Core; `VersionStatus` enum + `VersionCheckResult` readonly struct), `Zero.Services.VersionCheck/{VersionCheckService.cs, VersionCheckServiceInstaller.cs, Zero.Services.VersionCheck.asmdef}` — semver compare (3-part major.minor.patch; malformed → warn+Ok), bus order: maintenance > ForceUpdate (local<min) > SoftUpdate (local<recommended) > Ok. Service registered via `RegisterFactory` because the ctor takes a `string localVersion` Reflex can't auto-resolve.
+  - Bootstrap step: `Steps/VersionCheckStep.cs` (non-critical, runs after RemoteConfigStep). Registered + ordered in `ProjectScopeInstaller`.
+  - Asmdef wiring: `Zero.Bootstrap.asmdef` adds `Zero.Services.VersionCheck`. `Zero.Tests.EditMode.asmdef` adds `Zero.Services.VersionCheck` + `Zero.DevTools` + `Zero.Services.RemoteConfig`.
+  - Runtime DevTools: `Zero.DevTools/{IConsoleCommand.cs, ConsoleCommandAttribute.cs, BuiltInCommands.cs (4 commands), CheatConsole.cs, FpsOverlay.cs, DevToolsBootstrap.cs, Zero.DevTools.asmdef}`. Asmdef gated `defineConstraints: ["UNITY_EDITOR || DEVELOPMENT_BUILD"]`. Command discovery via reflection scan of all loaded assemblies; instantiation via `Container.Construct(Type)` (not `Resolve` — commands aren't registered as contracts) with fallback to `Activator.CreateInstance`. Cheat console toggle: tilde key + 4-finger touch via `Touchscreen.current.touches` (new Input System; legacy `Input.touchCount` would throw because project is Input-System-only). FPS overlay toggle: F2.
+  - Built-in commands: `loc set <locale>`, `version check`, `fps show/hide`, `save reset` (stub — logs "extend ISaveService per-game"; ISaveService has `Delete(key)` but no wholesale reset by design).
+  - Spawn: `DevToolsBootstrap.Initialize` via `[RuntimeInitializeOnLoadMethod(AfterSceneLoad)]` creates `[Zero.DevTools]` GameObject + `DontDestroyOnLoad`. Whole method ifdef-gated as belt-and-suspenders alongside the asmdef constraint.
+  - Tests: `VersionCheckServiceTests.cs` (9 cases — full decision matrix with injected local version "1.0.0"), `ConsoleCommandParserTests.cs` (8 cases — greedy two-word match, args splitting, unknown/empty/whitespace input).
+- Workflow: spawned **Haiku junior-dev** in worktree, then 3 review rounds in main session — round 1 caught 11 bugs, round 2 silenced 2 CS1998 warnings, round 3 fixed semver-test failure caused by `Application.version` template default ("0.1" 2-part).
+- Production bugs the review caught (would have shipped silently):
+  1. **`SaveResetCommand` called `ISaveService.ResetAsync(ct)`** — doesn't exist on the interface (Save has `Delete(key)` only, no wholesale reset by design). Replaced impl with a "stub — extend per-game" warn.
+  2. **`VersionCheckService.ParsedVersion` used C# 9 `init;` accessors** — needs `IsExternalInit` polyfill not present in Unity 6 .NET Standard 2.1. Same shape as Phase 3 `record struct` bug. Converted to readonly props with explicit ctor.
+  3. **`CheatConsole` referenced `ContainerScope.Root`** — doesn't exist in Reflex. Correct API is `Container.RootContainer` (verified against package source under `Library/PackageCache/com.gustavopsantos.reflex@*`).
+  4. **`CheatConsole` called `container.Resolve(commandType)`** — but command types aren't registered as Reflex contracts. Correct API is `container.Construct(Type)` which does ctor injection without registration; resolved deps still come from the container.
+  5. **`CheatConsole` used legacy `Input.touchCount` / `Input.GetTouch(0)`** — throws when "Active Input Handling" is set to Input System Package only (this project's setting per Phase 2). Switched to `Touchscreen.current.touches`.
+  6. **`Zero.DevTools.asmdef` missed `Unity.InputSystem` reference** — cascading from #5.
+  7. **`VersionCheckServiceTests` missed `using UnityEngine.TestTools;`** — `[UnityTest]` unresolved. Same shape as Phase 4 round 2 footgun.
+  8. **Test field declared as `private VersionCheckService.VersionCheckService _service;`** — namespace + class share name, so `VersionCheckService` is both the namespace and the class; the dotted form tries to resolve a nested static type that doesn't exist. Stripped to single name.
+  9. **`MockLogService.IsEnabled` was get-only** — interface declares both accessors. Same shape as Phase 4 round 2 stub mismatch. Made `{ get; set; }`.
+  10. **`ConsoleCommandParserTests.ParseCommand_NoArgsForCommand_EmptyArgsArray` assertion was wrong** — the command "fps" IS registered, so the parser returns it; corrected the assertion.
+  11. **Both new asmdefs referenced sibling asmdefs via fabricated GUID strings** — Unity would fail to resolve. Repo convention is plain string names (e.g. "Zero.Core"). Switched.
+  12. **Round 2 (CS1998 warnings):** `CheckAsync` was `async UniTask<...>` with no real await — synchronous compute path. Removed `async`, wrapped each return with `UniTask.FromResult`. Test cancellation lambda `async () => await _service.CheckAsync(...)` had no real outer await; switched to `() => _service.CheckAsync(...).AsTask()` + trailing `await UniTask.CompletedTask;`.
+  13. **Round 3 (test runtime failure):** ForceUpdate / SoftUpdate tests asserted ForceUpdate/SoftUpdate but got Ok. Cause: service used `Application.version` directly; default template ProductVersion is "0.1" (2-part) which fails 3-part semver parse → warn + Ok regardless of remote min_version. Fix: ctor takes `string localVersion`; production binding via `RegisterFactory` supplies `Application.version`; tests inject `"1.0.0"`.
+- Verification: console clean, Test Runner green (16 new + 39 prior = 55 EditMode cases). User confirmed.
+- Resume hint: Phase 5b is docs-only — `README.md`, `README.vi.md`, `LICENSE` (MIT), `CONTRIBUTING.md`, `CHANGELOG.md`, `docs/architecture/asmdef-graph.md` (final DAG), 6 service+liveops+devtools docs (`docs/services/version-check.md`, `docs/services/time.md`, `docs/liveops/version-check.md`, `docs/liveops/addressables-remote.md`, `docs/dev/cheat-console.md`, `docs/dev/fps-overlay.md`), 8 Mock SDK extension recipes (Crashlytics, Consent, RemoteConfig, Analytics, Attribution, Ads, IAP, ReceiptValidator), `docs/meta/recipes.md`. Branch `phase-5b-docs`.
 
 ### Phase 4 round 2 — Editor compile fixes
 

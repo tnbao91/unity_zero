@@ -25,6 +25,7 @@ using Zero.Services.RemoteConfig;
 using Zero.Services.Save;
 using Zero.Services.Scene;
 using Zero.Services.Time;
+using Zero.Services.VersionCheck;
 using Zero.Gameplay;
 using Zero.UI;
 using Resolution = Reflex.Enums.Resolution;
@@ -68,6 +69,7 @@ namespace Zero.Bootstrap
             PoolServiceInstaller.Install(builder);
             UIServiceInstaller.Install(builder);
             GameplayServiceInstaller.Install(builder);
+            VersionCheckServiceInstaller.Install(builder);
 
             // Infrastructure-level singletons that don't have their own installer module.
             builder.RegisterType(
@@ -98,6 +100,7 @@ namespace Zero.Bootstrap
                 var audio = c.Resolve<IAudioService>();
                 var time = c.Resolve<ITimeService>();
                 var notif = c.Resolve<INotificationService>();
+                var versionCheck = c.Resolve<IVersionCheckService>();
                 var reporter = c.Resolve<IBootstrapProgressReporter>();
 
                 // Order: Crashlytics first (critical), Log/Profile next so subsequent steps
@@ -124,6 +127,7 @@ namespace Zero.Bootstrap
                     new AudioStep(audio),
                     new TimeStep(time),
                     new NotificationStep(notif),
+                    new VersionCheckStep(versionCheck),
                 };
                 return new BootstrapPipeline(steps, log, reporter);
             }, Lifetime.Singleton, Resolution.Lazy);

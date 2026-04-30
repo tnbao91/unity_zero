@@ -25,6 +25,7 @@
         "Zero.Services.Save",
         "Zero.Services.Scene",
         "Zero.Services.Time",
+        "Zero.Services.VersionCheck",
         "Zero.Meta",
         "Zero.UI",
         "Zero.Gameplay",
