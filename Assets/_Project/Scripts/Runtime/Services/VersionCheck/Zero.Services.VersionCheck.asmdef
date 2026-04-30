@@ -1,0 +1,18 @@
+{
+    "name": "Zero.Services.VersionCheck",
+    "rootNamespace": "Zero.Services.VersionCheck",
+    "references": [
+        "GUID:6050f4c6f0cf2c94a9ba7ae7a1a5b4e6",
+        "GUID:18e76d77fd87f4a48b0c23dcd4f5cac6",
+        "GUID:b4f89e0d5abeac54aba47c0c0ad9c9f6",
+        "UniTask",
+        "Reflex"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": []
+}
