@@ -1,0 +1,19 @@
+{
+    "name": "Zero.DevTools",
+    "rootNamespace": "Zero.DevTools",
+    "references": [
+        "GUID:6050f4c6f0cf2c94a9ba7ae7a1a5b4e6",
+        "UniTask",
+        "Reflex",
+        "R3"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_EDITOR || DEVELOPMENT_BUILD"
+    ]
+}
