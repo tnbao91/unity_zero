@@ -18,7 +18,7 @@ namespace Zero.Services.VersionCheck
                     Application.version),
                 new[] { typeof(IVersionCheckService) },
                 Lifetime.Singleton,
-                Resolution.Lazy);
+                Reflex.Enums.Resolution.Lazy);
         }
     }
 }

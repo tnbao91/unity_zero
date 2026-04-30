@@ -128,6 +128,20 @@ Unity's Test Runner only enumerates EditMode test asmdefs that have `includePlat
 
 `Assets/Resources/ZeroSecrets.asset.example` references `ZeroSecrets.cs` by GUID. If `ZeroSecrets.cs.meta` isn't tracked in git, Unity generates a fresh random GUID on first import and the example asset's script reference dangles. The repo pre-commits `ZeroSecrets.cs.meta` with a deterministic GUID. Apply the same pattern any time you ship a sample/template `.asset` that binds to a script.
 
+### Reflex root container access — use `Container.RootContainer`, not `ContainerScope.Root`
+
+A non-injected MonoBehaviour (e.g. one spawned by `[RuntimeInitializeOnLoadMethod]`) needs to grab the root container manually. The right API is **`Container.RootContainer`** (static property, set internally when the root container is built). `ContainerScope` only exposes the `OnRootContainerBuilding` / `OnSceneContainerBuilding` events — there is no `ContainerScope.Root`. Phase 5a `CheatConsole` invented this and the code compiled-clean only after the reviewer cross-checked against the package source under `Library/PackageCache/com.gustavopsantos.reflex@*`.
+
+To instantiate a class that isn't registered as a Reflex contract (e.g. `IConsoleCommand` impls discovered via reflection), call `container.Construct(Type)` — it does ctor injection without requiring registration. `Resolve(Type)` would throw `UnknownContractException`.
+
+### Reflex `RegisterFactory` for ctors with non-contract parameters
+
+If a service's most-parameters ctor takes any value Reflex can't resolve from the container (`string`, `int`, raw `Func<>`, any unbound type), `RegisterType` throws `UnknownContractException` at first resolve. Use `builder.RegisterFactory<TContract>(c => new Impl(c.Resolve<X>(), literalOrComputedValue), contracts, lifetime, resolution)` instead. `VersionCheckServiceInstaller` is the canonical example — supplies `Application.version` for the `string localVersion` ctor parameter so tests can inject a known semver while production reads the real value.
+
+### Active Input Handling is "Input System Package" — legacy `Input.*` APIs throw
+
+Phase 2 set Active Input Handling to "Input System Package" only. Anywhere you reach for `Input.touchCount`, `Input.GetTouch(0)`, `Input.GetKey`, `Input.mousePosition` etc., the call throws at runtime. Use the new API: `Keyboard.current.<key>Key.wasPressedThisFrame`, `Mouse.current.position.value`, `Touchscreen.current.touches`, or go through `IInputService`/`EnhancedTouch` for gestures. Phase 5a `CheatConsole` round 1 had a 4-finger toggle implemented via `Input.touchCount` — only caught in review.
+
 ### `Observable<T>.Subscribe(Action<T>)` requires `using R3;` at the call site
 
 `R3.Observable<T>` only declares `Subscribe(Observer<T>)` as a class member. `Subscribe(Action<T> onNext)` is an **extension method** in the `R3` namespace. A test file that uses `bus.On<TEvent>().Subscribe(evt => ...)` without `using R3;` compiles to the `Observer<T>` overload and emits `CS1660: Cannot convert lambda expression to type 'Observer<T>' because it is not a delegate type`. This bit Phase 4 round 2 in two test files. Always add `using R3;` to any file that subscribes via lambda — even if the file doesn't otherwise reference R3 types directly (the extension lookup still needs the namespace in scope).
