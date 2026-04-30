@@ -23,7 +23,9 @@ namespace Zero.Tests.EditMode
         {
             _remoteConfig = new MockRemoteConfigService();
             _log = new MockLogService();
-            _service = new VersionCheckService(_remoteConfig, _log);
+            // Inject a known semver so tests don't depend on Application.version
+            // (default template ProductVersion is "0.1" which fails 3-part parse).
+            _service = new VersionCheckService(_remoteConfig, _log, "1.0.0");
         }
 
         [Test]

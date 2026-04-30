@@ -14,16 +14,20 @@ namespace Zero.Services.VersionCheck
 
         private readonly IRemoteConfigService _remoteConfig;
         private readonly ILogService _log;
+        private readonly string _localVersion;
 
         private VersionCheckResult _lastResult;
 
         public VersionCheckResult LastResult => _lastResult;
 
-        public VersionCheckService(IRemoteConfigService remoteConfig, ILogService log)
+        // Production ctor — Reflex picks this (most parameters) and binds via factory in
+        // VersionCheckServiceInstaller, which supplies Application.version.
+        public VersionCheckService(IRemoteConfigService remoteConfig, ILogService log, string localVersion)
         {
             _remoteConfig = remoteConfig;
             _log = log;
-            _lastResult = new VersionCheckResult(VersionStatus.Ok, Application.version, "");
+            _localVersion = localVersion;
+            _lastResult = new VersionCheckResult(VersionStatus.Ok, _localVersion, "");
         }
 
         public UniTask<VersionCheckResult> CheckAsync(CancellationToken ct = default)
@@ -33,7 +37,7 @@ namespace Zero.Services.VersionCheck
             // Check maintenance mode first
             if (_remoteConfig.TryGetBool(MaintenanceModeKey, out var maintenance) && maintenance)
             {
-                _lastResult = new VersionCheckResult(VersionStatus.Maintenance, Application.version, "");
+                _lastResult = new VersionCheckResult(VersionStatus.Maintenance, _localVersion, "");
                 return UniTask.FromResult(_lastResult);
             }
 
@@ -41,11 +45,11 @@ namespace Zero.Services.VersionCheck
             if (!_remoteConfig.TryGetString(MinVersionKey, out var remoteMinVersion))
             {
                 _log.Warn($"[VersionCheck] Missing '{MinVersionKey}' in remote config; assuming OK");
-                _lastResult = new VersionCheckResult(VersionStatus.Ok, Application.version, "");
+                _lastResult = new VersionCheckResult(VersionStatus.Ok, _localVersion, "");
                 return UniTask.FromResult(_lastResult);
             }
 
-            var localVersion = Application.version;
+            var localVersion = _localVersion;
             var minVersionParsed = ParseVersion(remoteMinVersion);
             var localVersionParsed = ParseVersion(localVersion);
 
