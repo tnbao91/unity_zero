@@ -26,7 +26,7 @@ namespace Zero.Services.VersionCheck
             _lastResult = new VersionCheckResult(VersionStatus.Ok, Application.version, "");
         }
 
-        public async UniTask<VersionCheckResult> CheckAsync(CancellationToken ct = default)
+        public UniTask<VersionCheckResult> CheckAsync(CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
 
@@ -34,7 +34,7 @@ namespace Zero.Services.VersionCheck
             if (_remoteConfig.TryGetBool(MaintenanceModeKey, out var maintenance) && maintenance)
             {
                 _lastResult = new VersionCheckResult(VersionStatus.Maintenance, Application.version, "");
-                return _lastResult;
+                return UniTask.FromResult(_lastResult);
             }
 
             // Get remote min version
@@ -42,7 +42,7 @@ namespace Zero.Services.VersionCheck
             {
                 _log.Warn($"[VersionCheck] Missing '{MinVersionKey}' in remote config; assuming OK");
                 _lastResult = new VersionCheckResult(VersionStatus.Ok, Application.version, "");
-                return _lastResult;
+                return UniTask.FromResult(_lastResult);
             }
 
             var localVersion = Application.version;
@@ -54,13 +54,13 @@ namespace Zero.Services.VersionCheck
             {
                 _log.Warn($"[VersionCheck] Invalid semver format (local={localVersion}, min={remoteMinVersion}); assuming OK");
                 _lastResult = new VersionCheckResult(VersionStatus.Ok, localVersion, remoteMinVersion);
-                return _lastResult;
+                return UniTask.FromResult(_lastResult);
             }
 
             if (CompareVersions(localVersionParsed, minVersionParsed) < 0)
             {
                 _lastResult = new VersionCheckResult(VersionStatus.ForceUpdate, localVersion, remoteMinVersion);
-                return _lastResult;
+                return UniTask.FromResult(_lastResult);
             }
 
             // Check if local is below recommended (soft update)
@@ -70,12 +70,12 @@ namespace Zero.Services.VersionCheck
                 if (recommendedVersionParsed.IsValid && CompareVersions(localVersionParsed, recommendedVersionParsed) < 0)
                 {
                     _lastResult = new VersionCheckResult(VersionStatus.SoftUpdate, localVersion, remoteMinVersion);
-                    return _lastResult;
+                    return UniTask.FromResult(_lastResult);
                 }
             }
 
             _lastResult = new VersionCheckResult(VersionStatus.Ok, localVersion, remoteMinVersion);
-            return _lastResult;
+            return UniTask.FromResult(_lastResult);
         }
 
         private static ParsedVersion ParseVersion(string version)

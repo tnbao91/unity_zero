@@ -112,7 +112,8 @@ namespace Zero.Tests.EditMode
             var cts = new CancellationTokenSource();
             cts.Cancel();
 
-            Assert.ThrowsAsync<OperationCanceledException>(async () => await _service.CheckAsync(cts.Token));
+            Assert.ThrowsAsync<OperationCanceledException>(() => _service.CheckAsync(cts.Token).AsTask());
+            await UniTask.CompletedTask;
         });
 
         private sealed class MockRemoteConfigService : IRemoteConfigService
