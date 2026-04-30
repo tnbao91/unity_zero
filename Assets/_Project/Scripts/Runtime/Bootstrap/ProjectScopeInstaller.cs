@@ -25,6 +25,7 @@ using Zero.Services.RemoteConfig;
 using Zero.Services.Save;
 using Zero.Services.Scene;
 using Zero.Services.Time;
+using Zero.Gameplay;
 using Zero.UI;
 using Resolution = Reflex.Enums.Resolution;
 
@@ -66,6 +67,7 @@ namespace Zero.Bootstrap
             NotificationServiceInstaller.Install(builder);
             PoolServiceInstaller.Install(builder);
             UIServiceInstaller.Install(builder);
+            GameplayServiceInstaller.Install(builder);
 
             // Infrastructure-level singletons that don't have their own installer module.
             builder.RegisterType(
