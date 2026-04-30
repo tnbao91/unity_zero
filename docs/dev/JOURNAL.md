@@ -199,3 +199,38 @@ User direction: framework should not init UI in code. Consumer authors UI hierar
 - Docs: new `docs/ui/ui-root.md` with step-by-step scene-setup recipe (8-step happy path, troubleshooting table, design rationale). `popup-stack.md` / `loading-screen.md` / `toast.md` updated to call out the UIRoot prerequisite. `CLAUDE.md` "Mock-first exceptions" entry rewritten to reflect consumer-owned root pattern.
 
 ---
+
+## Phase 4 — 2026-04-30 (pending merge, branch `phase-4-gameplay`)
+
+- Branch: `phase-4-gameplay` (4 commits; not yet merged to `main`)
+- Files touched:
+  - Runtime (new, under `Assets/_Project/Scripts/Runtime/Gameplay/`):
+    - `IGameState.cs` — interface: `EnterAsync(ct)`, `ExitAsync(ct)`, `Tick(deltaTime)`.
+    - `IGameStateMachine.cs` — interface: `CurrentState`, `Observable<IGameState> OnStateChanged`, `ChangeStateAsync`.
+    - `GameStateMachine.cs` — flat state machine; sequential ExitAsync→EnterAsync→OnNext; rejects null, same-instance re-entry, and concurrent transitions.
+    - `ILevelDefinition.cs` — abstract `ScriptableObject` (Id, DisplayName, AddressablePrefabKey).
+    - `LevelLoader.cs` — `LoadLevelAsync(key, ct)` returns `(GameObject Instance, IAssetHandle<GameObject> Handle)`; caller disposes handle.
+    - `GameplayServiceInstaller.cs` — Reflex installer; binds `GameStateMachine` (as `IGameStateMachine`) and `LevelLoader` (self-binding), both Singleton/Lazy.
+    - `Events/{LevelStarted, LevelCompleted, LevelFailed, LevelRestarted, LevelExited}.cs` — `readonly struct` event POCOs (namespace `Zero.Gameplay.Events`); explicit ctor (NOT `record struct` — Unity 6 LTS is C# 9).
+    - `States/{BootState, MenuState, PlayState, PauseState, ResultState}.cs` — minimal sample shells, EnterAsync logs only; consumer replaces.
+  - Bootstrap: `ProjectScopeInstaller.cs` — `using Zero.Gameplay;` + `GameplayServiceInstaller.Install(builder)`. **No bootstrap step** — state machine has no async init.
+  - Asmdef: `Zero.Tests.EditMode.asmdef` adds `Zero.Gameplay` reference. `Zero.Gameplay.asmdef` references unchanged (already had Core/Infrastructure/Events/UniTask/R3/Reflex/LitMotion; **no Zero.UI / no Zero.Meta** — peer rule preserved).
+  - Tests (3 new EditMode suites, ~14 cases):
+    - `GameStateMachineTests.cs` — initial null state, first transition sets state, transition calls Exit-before-Enter, re-entry of same instance throws, null state throws, OnStateChanged fires once per change, cancellation propagates, **concurrent ChangeStateAsync throws** (uses gated `SlowEnterState` to hold mid-transition).
+    - `LevelLifecycleEventsTests.cs` — round-trip for each of 5 level events through real `R3EventBus`.
+    - `GameplayUiDecouplingTests.cs` — integration "decoupling test" per PLAN §3 Phase 4 acceptance: real `R3EventBus`, fake "UI" subscriber receives `LevelCompleted`/`LevelFailed`/`LevelStarted` published by fake "Gameplay" caller; multi-subscriber fan-out; "publish-without-subscribers" silent path. The literal asmdef-grep check is verified manually (`grep "Zero.UI\|Zero.Meta" Zero.Gameplay.asmdef` → empty).
+  - Docs: `docs/gameplay/state-machine.md` and `docs/gameplay/level-loading.md` (fixed format).
+- Workflow: spawned **Haiku junior-dev** subagent (general-purpose, worktree isolation) to implement, then **Opus lead review** in main session — 5 bugs found and patched in 3 commits.
+- Production bugs the review caught (would have shipped silently otherwise):
+  1. **All 3 test files missed `using System.Collections;`** — `[UnityTest]` returns `IEnumerator`; without the using, every Phase 4 test file fails to compile. Same shape as prior-phase test scaffolding bug.
+  2. **`LevelLoader.cs` `Object.Instantiate` ambiguous** — `using System` + `using UnityEngine` collide on `Object` (CS0104). Same footgun as Phase 3 round 3; PITFALLS entry already existed but new code skipped the alias. Fix: `using Object = UnityEngine.Object;`.
+  3. **`LevelLoader` had `IAssetService` ctor dep but was never registered with Reflex** — would `IsRegistered = false` from the container; consumer trying to inject `LevelLoader` would get a Reflex resolution exception. Fix: self-binding `RegisterType(typeof(LevelLoader), new[] { typeof(LevelLoader) }, ...)` in `GameplayServiceInstaller`.
+  4. **`ChangeStateAsync` did not call `ct.ThrowIfCancellationRequested()` at entry** — when called with pre-cancelled token AND no current state AND not already transitioning, the method took no real await path and never observed the token; cancellation was silently ignored. The CancellationPropagates test would have failed at runtime. Fix: explicit `ct.ThrowIfCancellationRequested()` after `ThrowIfDisposed()`.
+  5. **Concurrent-transition "queue" was racy** — `while (_isTransitioning) await UniTask.Yield(ct)` busy-wait with non-atomic `_isTransitioning = true` meant when transition N ended, all queued awaiters woke and raced for the slot, leaving final state undefined. PLAN §3 said "queued or rejected (decide)"; picked **reject** as the minimal-template choice (real queue adds hidden ordering surprises). Replaced racy `SequentialCalls_NoReentrancy` test with `ConcurrentCall_Throws` using a gated `SlowEnterState`. Updated `IGameStateMachine` xmldoc.
+- Verification:
+  - **Static**: every API signature in the new code re-read against actual source files in `Assets/_Project/Scripts/Runtime/Core/Interfaces/*.cs` (IAssetService, IEventBus) and existing installers (`EventsServiceInstaller`, `AudioServiceInstaller`) for Reflex registration shape. Compile-clean by inspection.
+  - **Headless EditMode test run**: not attempted — user's Editor was running on prior phases too. User to run via Test Runner before merge.
+  - **`.meta` files**: not generated yet for new `.cs`/`.asmdef` files (Unity creates on next Editor open). User commits resulting metas after first Editor open. Same situation as Phase 3 (UIRoot.cs.meta was committed post-merge).
+- Resume hint: do not merge `phase-4-gameplay` to `main` until user confirms (a) Editor compiles clean (no missing-reference / asmdef errors), (b) EditMode suite green in Test Runner, and (c) Bootstrap.unity Press Play runs through to completion (no UIStep regression — UIRoot pattern from Phase 3 unchanged). After merge, Phase 5 — Live-ops + DevTools + cross-cutting docs, branch `phase-5-liveops-devtools`. Note: Phase 5 is the final phase (PLAN renumbered to 5 in §3); meta layer remains out of scope per §2.4.
+
+---
