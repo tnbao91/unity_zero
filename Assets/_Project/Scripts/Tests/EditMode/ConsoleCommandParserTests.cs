@@ -98,7 +98,9 @@ namespace Zero.Tests.EditMode
         {
             var (cmd, args) = ParseCommand("fps", _commands);
 
-            Assert.IsNull(cmd); // "fps" with no args doesn't match "fps" command in this mock setup
+            Assert.IsNotNull(cmd);
+            Assert.AreEqual("fps", cmd.Name);
+            Assert.AreEqual(Array.Empty<string>(), args);
         }
 
         private static (IConsoleCommand, string[]) ParseCommand(string input, Dictionary<string, IConsoleCommand> commands)

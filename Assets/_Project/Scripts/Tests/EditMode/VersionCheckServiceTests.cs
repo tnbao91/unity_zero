@@ -6,6 +6,7 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using R3;
+using UnityEngine.TestTools;
 using Zero.Core;
 using Zero.Services.VersionCheck;
 
@@ -15,7 +16,7 @@ namespace Zero.Tests.EditMode
     {
         private MockRemoteConfigService _remoteConfig;
         private MockLogService _log;
-        private VersionCheckService.VersionCheckService _service;
+        private VersionCheckService _service;
 
         [SetUp]
         public void Setup()
@@ -176,14 +177,14 @@ namespace Zero.Tests.EditMode
 
         private sealed class MockLogService : ILogService
         {
-            private List<string> _warns = new();
+            private readonly List<string> _warns = new();
 
-            public bool IsEnabled => true;
+            public bool IsEnabled { get; set; } = true;
 
             public void Info(string message) { }
             public void Warn(string message) => _warns.Add(message);
             public void Error(string message) { }
-            public void Error(System.Exception exception, string message) { }
+            public void Error(System.Exception exception, string context = null) { }
 
             public bool HasWarnedAbout(string text) => _warns.Any(w => w.Contains(text));
         }

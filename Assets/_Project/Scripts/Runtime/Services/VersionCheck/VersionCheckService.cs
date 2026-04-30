@@ -81,26 +81,20 @@ namespace Zero.Services.VersionCheck
         private static ParsedVersion ParseVersion(string version)
         {
             if (string.IsNullOrWhiteSpace(version))
-                return new ParsedVersion { IsValid = false };
+                return new ParsedVersion(false, 0, 0, 0);
 
             var parts = version.Split('.');
             if (parts.Length < 3)
-                return new ParsedVersion { IsValid = false };
+                return new ParsedVersion(false, 0, 0, 0);
 
             if (!int.TryParse(parts[0], out var major) ||
                 !int.TryParse(parts[1], out var minor) ||
                 !int.TryParse(parts[2], out var patch))
             {
-                return new ParsedVersion { IsValid = false };
+                return new ParsedVersion(false, 0, 0, 0);
             }
 
-            return new ParsedVersion
-            {
-                IsValid = true,
-                Major = major,
-                Minor = minor,
-                Patch = patch
-            };
+            return new ParsedVersion(true, major, minor, patch);
         }
 
         /// <summary>
@@ -120,10 +114,18 @@ namespace Zero.Services.VersionCheck
 
         private readonly struct ParsedVersion
         {
-            public bool IsValid { get; init; }
-            public int Major { get; init; }
-            public int Minor { get; init; }
-            public int Patch { get; init; }
+            public bool IsValid { get; }
+            public int Major { get; }
+            public int Minor { get; }
+            public int Patch { get; }
+
+            public ParsedVersion(bool isValid, int major, int minor, int patch)
+            {
+                IsValid = isValid;
+                Major = major;
+                Minor = minor;
+                Patch = patch;
+            }
         }
     }
 }

@@ -39,14 +39,17 @@ namespace Zero.DevTools
                 _isOpen = !_isOpen;
             }
 
-            // Mobile: 4-finger tap to toggle
-            if (Input.touchCount >= 4)
+            // Mobile: 4-finger tap (new Input System touchscreen). Legacy Input.touchCount
+            // is unavailable when "Active Input Handling" is set to Input System Package.
+            var touchscreen = Touchscreen.current;
+            if (touchscreen != null)
             {
-                var touch = Input.GetTouch(0);
-                if (touch.phase == TouchPhase.Began)
+                int began = 0;
+                foreach (var t in touchscreen.touches)
                 {
-                    _isOpen = !_isOpen;
+                    if (t.press.wasPressedThisFrame) began++;
                 }
+                if (began >= 4) _isOpen = !_isOpen;
             }
         }
 
@@ -106,19 +109,23 @@ namespace Zero.DevTools
                         if (attr == null)
                             continue;
 
-                        // Try to instantiate via Reflex container first
+                        // Try to construct via Reflex container first (fills [Inject] ctor params).
+                        // Container.Construct does constructor injection without requiring the
+                        // command type to be registered as a contract — services that ARE
+                        // registered get pulled from the container.
                         IConsoleCommand cmd = null;
                         try
                         {
-                            var container = ContainerScope.Root;
+                            var container = Container.RootContainer;
                             if (container != null)
                             {
-                                cmd = (IConsoleCommand)container.Resolve(type);
+                                cmd = (IConsoleCommand)container.Construct(type);
                             }
                         }
                         catch
                         {
-                            // Reflex resolve failed, try default constructor
+                            // Reflex construct failed (likely an unresolved dependency), fall back
+                            // to parameterless ctor. Commands without service deps still work.
                         }
 
                         if (cmd == null)

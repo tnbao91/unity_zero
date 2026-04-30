@@ -5,25 +5,28 @@ using Zero.Core;
 
 namespace Zero.DevTools
 {
-    [ConsoleCommand("save", "Usage: save reset — clears all saved data")]
+    [ConsoleCommand("save", "Usage: save reset — not implemented in template; consumer must extend ISaveService.")]
     public sealed class SaveResetCommand : IConsoleCommand
     {
-        private readonly ISaveService _saveService;
         private readonly ILogService _log;
 
         public string Name => "save reset";
-        public string Help => "Resets all saved game data";
+        public string Help => "Reset save (template stub — consumer extends ISaveService)";
 
-        public SaveResetCommand(ISaveService saveService, ILogService log)
+        public SaveResetCommand(ILogService log)
         {
-            _saveService = saveService;
             _log = log;
         }
 
-        public async UniTask ExecuteAsync(string[] args, CancellationToken ct = default)
+        public UniTask ExecuteAsync(string[] args, CancellationToken ct = default)
         {
-            await _saveService.ResetAsync(ct);
-            _log.Info("[Console] Save data cleared");
+            // ISaveService has Delete(key) but no wholesale reset. The template
+            // intentionally does not iterate keys (no GetAllKeys API by design —
+            // consumers may have legitimate persistent state outside the template).
+            // Per-game implementation: extend ISaveService with a Reset, or write a
+            // game-specific console command that knows which keys to delete.
+            _log.Warn("[Console] 'save reset' is a stub. Override ISaveService or write a game-specific reset command.");
+            return UniTask.CompletedTask;
         }
     }
 
