@@ -110,3 +110,92 @@ Append-only log of phase implementations. One entry per phase complete.
 - Resume hint: do not merge `phase-2-real-services` to `main` until user confirms (a) EditMode suite green in Test Runner and (b) Bootstrap.unity Press Play runs through to completion. After merge, Phase 3 — UI scaffolding (popup stack, transitions, loading screen, toast, localized text) on branch `phase-3-ui`.
 
 ---
+
+## Phase 3 — 2026-04-30 (pending merge, branch `phase-3-ui`)
+- Branch: `phase-3-ui`
+- Files touched:
+  - Interfaces: `Assets/_Project/Scripts/Runtime/Core/Interfaces/IUIService.cs` (reshaped to generic popup API)
+  - Events: `Assets/_Project/Scripts/Runtime/Core/Events/UIEvents.cs` (PopupOpened, PopupClosed, PopupBackdropTapped)
+  - Runtime UI (new, under `Assets/_Project/Scripts/Runtime/UI/`):
+    - `UIService.cs` — main service, owns PopupStack + ScreenManager + ToastQueue, loads prefabs via Addressables
+    - `UiLayer.cs` — layer sort order constants (Hud=100, Popup=200, Overlay=300, System=400)
+    - `PopupHandle.cs` — generic result handle for typed popup returns
+    - `PopupBase.cs` — abstract MonoBehaviour base + `IPopup<TData, TResult>` interface, virtual transition hooks
+    - `PopupStack.cs` — internal FIFO stack with sort order assignment per layer
+    - `ScreenManager.cs` — fullscreen one-at-a-time screen loading + optional `IScreenInitializable<TData>`
+    - `LayerCanvas.cs` — static helper to runtime-build 4 Canvas GameObjects per layer
+    - `LoadingScreenView.cs` — component-only, reads from `IBootstrapProgressReporter` (never resolves pipeline)
+    - `SafeAreaFitter.cs` — component-only, fits RectTransform to Screen.safeArea, re-applies on orientation change
+    - `LocalizedText.cs` — component-only, subscribes `IL10nService.OnLocaleChanged`, auto-updates TextMeshProUGUI
+    - `ToastQueue.cs` — FIFO queue with max-16 cap, loads toast prefab from Addressables key `ui/toast/default`
+    - `Transitions/UITransitions.cs` — static LitMotion-backed helpers (FadeIn/Out, SlideIn/Out, ScaleIn/Out)
+    - `UIServiceInstaller.cs` — Reflex installer, registers UIService as singleton, lazy
+  - Bootstrap: `Assets/_Project/Scripts/Runtime/Bootstrap/Steps/UIStep.cs` — non-critical step, calls `UIService.InitializeAsync`
+  - Bootstrap config: updated `ProjectScopeInstaller.cs` (add UIServiceInstaller.Install call, add UIStep to pipeline after LocalizationStep)
+  - Tests: `Assets/_Project/Scripts/Tests/EditMode/`:
+    - `PopupStackTests.cs` — push/pop ordering, replace, sort order monotonic, queue enqueue/dequeue
+    - `ToastQueueTests.cs` — max queue capacity drop behavior (smoke test, async `[UnityTest]`)
+    - `UITransitionInterruptionTests.cs` — fade cancellation + sequential transitions after cancellation
+  - Asmdef: `Zero.UI.asmdef` (add LitMotion, LitMotion.Extensions, Unity.TextMeshPro, Unity.Addressables); `Zero.Tests.EditMode.asmdef` (add Zero.UI, R3, LitMotion)
+  - Docs: new files under `docs/ui/`:
+    - `popup-stack.md` — push/pop/replace, backdrop event, custom popup pattern, transition override
+    - `loading-screen.md` — component-only contract, no prefab ships, IBootstrapProgressReporter read-only
+    - `safe-area.md` — notch support, polling for orientation change, Editor Game view limitation
+    - `toast.md` — FIFO queue, Addressables key, auto-dismiss duration, max 16 message cap
+    - `localized-text.md` — R3 subscription on locale change, fallback-to-key on missing
+  - Updated: `docs/testing/manual-checklist.md` (append Phase 3 UI section), `CLAUDE.md` (add UIService to exceptions + Phase 3 items to "easy to miss")
+- Key decisions:
+  - `PopupBase<TData, TResult>` is generic two-parameter type (data input, result output) for strong typing. Default transitions (Fade/Slide/Scale) via enum + LitMotion, overrideable via virtual hooks.
+  - Modal mask is NOT auto-rendered; consumer includes a raycast-blocker Image in their popup prefab.
+  - Layer canvases built at runtime by `LayerCanvas.Build()` in `UIStep` with `DontDestroyOnLoad` (guarded by `Application.isPlaying`). Zero canvases in `Bootstrap.unity`.
+  - `LoadingScreenView` injects `IBootstrapProgressReporter` (not `BootstrapPipeline`) to avoid Lazy-singleton resolution races. Component-only; no prefab ships.
+  - `SafeAreaFitter` polls Screen dimensions in Update to detect orientation changes (more reliable than `OnScreenOrientationChanged` callback which fires unpredictably).
+  - `ToastQueue` uses `HasKeyAsync` pre-check before loading toast prefab to avoid Addressables red errors on missing key. Queues up to 16; older messages drop if exceeded.
+  - Popup prefabs loaded from `ui/popup/<name>` (derived from PopupBase subclass name). Screen prefabs from `ui/screen/<name>`. Toast from `ui/toast/default`.
+  - `PopupStack.Push` returns assigned sort order (for consumer to apply to Canvas.sortingOrder if needed). Internal; UIService handles sort order assignment.
+  - No extension points for PopupStack internals; entire stack logic kept testable without real Canvases (PopupStack works with plain GameObjects).
+- Tests: 3 new EditMode suites (PopupStackTests, ToastQueueTests, UITransitionInterruptionTests). Previous 22 from Phases 1a/1b/2 should still pass.
+- Deviations from plan:
+  - None major. Popup key convention is `typeof(TPopup).Name.ToLowerInvariant()` (not `[PopupKey("name")]` attribute) — simpler, no magic, explicit per-type.
+  - `ScreenManager.IScreenInitializable<TData>` optional interface (not mandatory callback) — consumer screen only implements if custom init needed.
+- Verification plan (blocked by Editor lock):
+  - **Headless EditMode tests**: 25 total (22 + 3 new). `Unity -batchmode ...` blocked by user's running Editor. Manual run via Test Runner owed.
+  - **Editor Press Play**: UIStep runs after LocalizationStep, 4 layer canvases appear in DontDestroyOnLoad hierarchy, bootstrap completes.
+  - **Manual checklist** (append to `docs/testing/manual-checklist.md`): loading screen progress 0→1, safe area on iOS/Android, LocalizedText on locale change, toast FIFO.
+- Resume hint: after Phase 3 merges to `main`, Phase 4 is Gameplay scaffolding (state machine, level lifecycle, domain events). Branch `phase-4-gameplay`. No UI phase further required unless consumer feeds back bugs or design feedback during their manual testing.
+
+### Round 2 patches (2026-04-30)
+
+- 8 bugs fixed across UIService, PopupHandle, ToastQueue, PopupStack (IL2CPP compat, double-dispose, raycasting, exception leaks, backdrop sort drift).
+- Commits:
+  1. `fix(ui): replace dynamic with IPopupHandle for IL2CPP compat` — IPopupHandle interface added to PopupHandle.cs; PopupHandle<TResult> implements it. UIService._activePopups changed from `Stack<(..., dynamic, ...)>` to `Stack<(..., IPopupHandle, ...)>`. PopAsync calls `handle.Cancel()` directly without `dynamic` dispatch (Bug 15).
+  2. `fix(ui): remove fictional Debug.LogDebug` — ToastQueue.cs line 102 changed `Debug.LogDebug` → `Debug.Log` (Bug 16).
+  3. `fix(ui): remove double-dispose of prefab handles` — _loadedHandles field removed; per-push `prefabHandle?.Dispose()` in finally block is the only dispose path (Bug 17).
+  4. `fix(ui): add GraphicRaycaster to backdrop Canvas` — CreateBackdrop now adds `GraphicRaycaster` component after `Canvas` to enable raycasting on override-sorting sub-canvas (Bug 18).
+  5. `fix(ui): pop _activePopups on OnOpenAsync exception` — OnOpenAsync catch block now pops both _activePopups and popup-stack to prevent leaked entries (Bug 19).
+  6. `fix(ui): clarify PopupClosed publish path in cancellation` — Added comment at PushAsync line 165 explaining PopupClosed is published by PopAsync, not re-published on handle exception (Bug 20).
+  7. `refactor(ui): use PeekNextSortOrder to avoid backdrop sort drift` — PopupStack.PeekNextSortOrder() added; UIService.CreateBackdrop call site now uses it instead of duplicating formula (Bug 21).
+  8. `refactor(ui): remove unused System.Linq` — Removed unused `using System.Linq` from UIService.cs (Bug 22).
+- Verification: compile checked by diff inspection (IL2CPP compat via interface dispatch, no more fictional APIs, no more dynamic keyword, consistent sort order formula, proper exception cleanup, no double-dispose). Asmdef references verified; all new types internal-scoped except IPopupHandle (public for interface impl). Tests remain unchanged (PopupStackTests, ToastQueueTests, UITransitionInterruptionTests expected to pass).
+
+### Round 3 — Editor compile fixes (2026-04-30)
+
+User Editor surfaced multiple compile errors after round 2 patches. Each fixed in turn:
+
+- `record struct` in `UIEvents.cs` requires C# 10; Unity 6 LTS uses C# 9. Converted to plain `readonly struct` with explicit ctor (commit `8d24457`).
+- `LoadingScreenView` / `LocalizedText` referenced non-existent `R3.IDisposable`; R3 returns `System.IDisposable`. Added `using System; using R3;`. `PopupBase.CurrentData` had `protected get; protected set;` — CS0273 (setter must be more restrictive than property); changed to `private set` (commit `e0eed6a`).
+- `UIServiceInstaller` used Reflex's generic `RegisterType<T>().As<I>()` API which doesn't exist in this Reflex version; switched to `RegisterType(typeof(UIService), new[] { typeof(IUIService) }, ...)` matching `AudioServiceInstaller`. `UITransitions` called `BindToCanvasGroupAlpha` (fictional); correct LitMotion uGUI extension is `BindToAlpha(CanvasGroup)` (verified in package source `LitMotionUGUIExtensions.cs:146`). `PopupStack._queue` was `Queue<PopupEntry>` but methods enqueued raw `GameObject`; aligned to `Queue<GameObject>`. `Object` ambiguous between `UnityEngine.Object` and `System.Object` in UIService/ScreenManager/ToastQueue; added `using Object = UnityEngine.Object` alias (commit `8d8cb92`).
+- Tests: missing `using UnityEngine.TestTools;` for `[UnityTest]`. `MockAssetService` used `Task<T>` with `where T : class`; rewritten to `UniTask<T>` with `where T : UnityEngine.Object` matching `IAssetService`; added missing `PreloadAsync(IReadOnlyList<string>, IProgress<float>, CancellationToken)` (commits `73cad0a`, `6942892`).
+- `UITransitionInterruptionTests.SequentialTransitions_AfterCancellation_Works` failed at runtime: LitMotion's `ToUniTask` awaits PlayerLoop Update ticks; EditMode does not tick the default Update timing, so the second (non-cancelled) tween never completes. Marked `[Ignore("Requires PlayMode")]`; PlayMode coverage moved to manual checklist (commit `2f1240a`).
+
+### Round 4 — UIRoot refactor (2026-04-30, commit `0bd13a3`)
+
+User direction: framework should not init UI in code. Consumer authors UI hierarchy in their own scene and points a `UIRoot` MonoBehaviour at the four layer Transforms; `Bootstrap.unity` stays minimal (splash-only).
+
+- Deleted `LayerCanvas.cs` and `UIStep.cs`. Removed UIStep from `ProjectScopeInstaller.steps`.
+- `IUIService`: removed `InitializeAsync`; added `AttachRoot(IReadOnlyDictionary<UiLayer, Transform>)` and `DetachRoot()`.
+- `UIService`: layer Transforms populated by `AttachRoot`; `ScreenManager` + `ToastQueue` instantiated inside `AttachRoot`. All `Push/Pop/ShowScreen` guarded by `EnsureRootAttached()` → throws `InvalidOperationException` with explicit fix instructions if no root. `ShowToast` warns + drops message (fire-and-forget API stays no-throw).
+- New `UIRoot.cs`: 4 SerializeField Transforms (Hud/Popup/Overlay/System), `[Inject] IUIService`. `OnEnable` builds layer dict and calls `AttachRoot`; `OnDisable` calls `DetachRoot`. Emits clear console errors if Reflex didn't inject (scene loaded outside container scope).
+- Docs: new `docs/ui/ui-root.md` with step-by-step scene-setup recipe (8-step happy path, troubleshooting table, design rationale). `popup-stack.md` / `loading-screen.md` / `toast.md` updated to call out the UIRoot prerequisite. `CLAUDE.md` "Mock-first exceptions" entry rewritten to reflect consumer-owned root pattern.
+
+---

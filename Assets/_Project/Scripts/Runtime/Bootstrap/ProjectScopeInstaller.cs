@@ -25,6 +25,7 @@ using Zero.Services.RemoteConfig;
 using Zero.Services.Save;
 using Zero.Services.Scene;
 using Zero.Services.Time;
+using Zero.UI;
 using Resolution = Reflex.Enums.Resolution;
 
 namespace Zero.Bootstrap
@@ -64,6 +65,7 @@ namespace Zero.Bootstrap
             InputServiceInstaller.Install(builder);
             NotificationServiceInstaller.Install(builder);
             PoolServiceInstaller.Install(builder);
+            UIServiceInstaller.Install(builder);
 
             // Infrastructure-level singletons that don't have their own installer module.
             builder.RegisterType(
@@ -100,7 +102,9 @@ namespace Zero.Bootstrap
                 // can log + read device info, Save moved up so any later step can read
                 // persisted settings (audio volume, locale preference, consent state).
                 // Localization sits next to Analytics so UI text is ready before Attribution
-                // / Ads / IAP surface any localized errors.
+                // / Ads / IAP surface any localized errors. UIService has no bootstrap
+                // step — consumers attach a UIRoot MonoBehaviour to their scene to wire
+                // layer canvases at scene-load time.
                 var steps = new IBootstrapStep[]
                 {
                     new CrashlyticsStep(crash),
