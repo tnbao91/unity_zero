@@ -13,8 +13,8 @@ namespace Zero.Tests.EditMode
     {
         private sealed class TestState : IGameState
         {
-            public bool EnterCalled { get; private set; }
-            public bool ExitCalled { get; private set; }
+            public bool EnterCalled { get; set; }
+            public bool ExitCalled { get; set; }
 
             public UniTask EnterAsync(CancellationToken ct)
             {
@@ -95,9 +95,10 @@ namespace Zero.Tests.EditMode
             UniTask.ToCoroutine(async () =>
             {
                 var machine = new GameStateMachine();
-                await Assert.ThrowsAsync<ArgumentNullException>(
+                Assert.ThrowsAsync<ArgumentNullException>(
                     () => machine.ChangeStateAsync(null).AsTask());
                 machine.Dispose();
+                await UniTask.CompletedTask;
             });
 
         [UnityTest]
@@ -134,6 +135,7 @@ namespace Zero.Tests.EditMode
                     () => machine.ChangeStateAsync(state1, cts.Token).AsTask());
                 Assert.IsNotNull(ex);
                 machine.Dispose();
+                await UniTask.CompletedTask;
             });
 
         [UnityTest]
