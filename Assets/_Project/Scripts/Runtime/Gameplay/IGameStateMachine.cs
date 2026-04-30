@@ -23,8 +23,9 @@ namespace Zero.Gameplay
 
         /// <summary>
         /// Transition to a new state. Sequentially calls CurrentState.ExitAsync, then newState.EnterAsync.
-        /// If already transitioning, queues or rejects per implementation.
-        /// Throws if newState is null or if the transition times out / is cancelled.
+        /// Throws InvalidOperationException if a transition is already in progress — consumer must
+        /// await the previous call before starting another.
+        /// Throws ArgumentNullException if newState is null, OperationCanceledException on cancel.
         /// </summary>
         UniTask ChangeStateAsync(IGameState newState, CancellationToken ct = default);
     }

@@ -33,6 +33,7 @@ namespace Zero.Gameplay
         public async UniTask ChangeStateAsync(IGameState newState, CancellationToken ct = default)
         {
             ThrowIfDisposed();
+            ct.ThrowIfCancellationRequested();
 
             if (newState == null)
                 throw new ArgumentNullException(nameof(newState));
@@ -41,12 +42,11 @@ namespace Zero.Gameplay
             if (_currentState != null && ReferenceEquals(_currentState, newState))
                 throw new InvalidOperationException($"Attempt to re-enter state {newState.GetType().Name}. Create a fresh instance if the state is reusable.");
 
-            // Allow nested transitions: if already transitioning, this call will await the current one
-            // then proceed. No explicit queue needed; the await provides sequential ordering.
-            while (_isTransitioning)
-            {
-                await UniTask.Yield(cancellationToken: ct);
-            }
+            // Reject concurrent transitions. Consumer is responsible for sequencing.
+            // A real queue would add hidden ordering surprises; explicit reject is the
+            // minimal-template choice per PLAN §3 Phase 4 ("queued or rejected — decide").
+            if (_isTransitioning)
+                throw new InvalidOperationException("A state transition is already in progress. Await the previous ChangeStateAsync before starting another.");
 
             _isTransitioning = true;
             try

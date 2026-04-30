@@ -137,26 +137,33 @@ namespace Zero.Tests.EditMode
             });
 
         [UnityTest]
-        public IEnumerator ChangeStateAsync_SequentialCalls_NoReentrancy() =>
+        public IEnumerator ChangeStateAsync_ConcurrentCall_Throws() =>
             UniTask.ToCoroutine(async () =>
             {
                 var machine = new GameStateMachine();
-                var state1 = new TestState();
+                var state1 = new SlowEnterState();
                 var state2 = new TestState();
-                var state3 = new TestState();
 
-                // Chain three transitions in rapid fire (state1 → state2 → state3).
-                // The implementation queues via yield loops, so all three should complete sequentially.
-                var task1 = machine.ChangeStateAsync(state1);
-                var task2 = machine.ChangeStateAsync(state2);
-                var task3 = machine.ChangeStateAsync(state3);
+                // Start state1 (its EnterAsync awaits a delay, so the transition is mid-flight).
+                var pending = machine.ChangeStateAsync(state1);
 
-                await UniTask.WhenAll(task1, task2, task3);
+                // Second call while first is in progress must throw — consumer is responsible for sequencing.
+                Assert.ThrowsAsync<InvalidOperationException>(
+                    () => machine.ChangeStateAsync(state2).AsTask());
 
-                // Final state should be state3
-                Assert.AreEqual(state3, machine.CurrentState);
-                Assert.IsTrue(state3.EnterCalled);
+                state1.ReleaseEnter();
+                await pending;
+                Assert.AreEqual(state1, machine.CurrentState);
                 machine.Dispose();
             });
+
+        private sealed class SlowEnterState : IGameState
+        {
+            private readonly UniTaskCompletionSource _gate = new();
+            public void ReleaseEnter() => _gate.TrySetResult();
+            public async UniTask EnterAsync(CancellationToken ct) => await _gate.Task.AttachExternalCancellation(ct);
+            public UniTask ExitAsync(CancellationToken ct) => UniTask.CompletedTask;
+            public void Tick(float deltaTime) { }
+        }
     }
 }
