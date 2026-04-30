@@ -1,9 +1,7 @@
 using System.Collections;
-using System.Threading;
 using Cysharp.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine.TestTools;
-using Zero.Core;
 using Zero.Gameplay.Events;
 using Zero.Services.Events;
 
@@ -11,15 +9,6 @@ namespace Zero.Tests.EditMode
 {
     public sealed class LevelLifecycleEventsTests
     {
-        private sealed class StubLogService : ILogService
-        {
-            public bool IsEnabled => true;
-            public void Debug(string message) { }
-            public void Info(string message) { }
-            public void Warning(string message) { }
-            public void Error(string message) { }
-        }
-
         [UnityTest]
         public IEnumerator LevelStarted_PublishedAndSubscribed() =>
             UniTask.ToCoroutine(async () =>
