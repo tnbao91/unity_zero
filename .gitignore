@@ -77,3 +77,10 @@ Thumbs.db
 !.vscode/settings.json
 !.vscode/launch.json
 *.swp
+
+# Re-include UPM package "hidden" folders (Unity convention: ~ suffix = Unity ignores; git must NOT).
+# Some users have *~ in their global gitignore for emacs backups — this overrides that for these specific paths.
+!Packages/**/Documentation~/
+!Packages/**/Documentation~/**
+!Packages/**/Samples~/
+!Packages/**/Samples~/**

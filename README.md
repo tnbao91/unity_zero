@@ -1,11 +1,84 @@
-# Unity Zero — Hybrid Casual Game Template
-
-Opensource greenfield Unity 6 LTS template for hybrid casual and puzzle games. Minimal, production-ready infrastructure with extension points for rapid game iteration. Meta loop (wallet / progression / rewards) is intentionally out of scope — see `docs/meta/recipes.md` for per-game patterns.
+# Zero — Hybrid Casual Unity Template
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Unity 6.0.3.11f1](https://img.shields.io/badge/Unity-6.0.3.11f1-black.svg)](ProjectSettings/ProjectVersion.txt)
+[![openupm](https://img.shields.io/npm/v/com.tnbao91.nobody.zero?label=openupm&registry_uri=https://package.openupm.com)](https://openupm.com/packages/com.tnbao91.nobody.zero/)
 
-## Stack (locked, do not substitute)
+Opinionated Unity 6 LTS template for hybrid casual / puzzle games. Distributed as a Unity Package Manager package — install once, update via Package Manager. Stack: Reflex DI · UniTask · R3 · LitMotion · Addressables · Newtonsoft · ZString · New Input System.
+
+> **Meta layer (wallet / progression / rewards) is intentionally out of scope** — hybrid casual and puzzle have different meta loops. See [`docs/meta/recipes.md`](docs/meta/recipes.md) for per-game patterns.
+
+---
+
+This repository serves two audiences:
+
+- **Game developers** consuming the template → [Install via Package Manager](#install-via-package-manager).
+- **Contributors** to the package itself → [Develop in this repo](#develop-in-this-repo).
+
+---
+
+## Install via Package Manager
+
+### 1. Add scoped registries
+
+In your project's `Packages/manifest.json`:
+
+```jsonc
+{
+  "scopedRegistries": [
+    {
+      "name": "OpenUPM",
+      "url": "https://package.openupm.com",
+      "scopes": [
+        "com.cysharp",
+        "com.gustavopsantos",
+        "com.annulusgames",
+        "com.tnbao91",
+        "com.github-glitchenzo"
+      ]
+    }
+  ]
+}
+```
+
+### 2. Install NuGetForUnity (prereq for R3 BCL transitive deps)
+
+`Window → Package Manager → "+" → Add package by name` → `com.github-glitchenzo.nugetforunity`.
+
+### 3. Install Zero
+
+```sh
+openupm add com.tnbao91.nobody.zero
+```
+
+Or `Add package by name` → `com.tnbao91.nobody.zero`.
+
+### 4. Import Bootstrap sample
+
+`Package Manager → Zero → Samples → Import "Bootstrap Scene"`. Files land in `Assets/Samples/com.tnbao91.nobody.zero/<version>/BootstrapScene/`. Then:
+
+- Move `Bootstrap.unity` to your scenes folder, add to Build Settings.
+- Move `ReflexSettings.asset` to `Assets/Resources/`.
+- Copy `packages.config` to `Assets/`, then `NuGet → Restore Packages` to fetch the 4 BCL DLLs R3 needs.
+
+### 5. Configure save encryption seeds
+
+- Move `ZeroSecrets.asset.example` to `Assets/Resources/`, rename to `ZeroSecrets.asset`.
+- Replace placeholder seeds in the Inspector with per-game random strings. Do **not** commit them.
+
+### 6. Press Play
+
+Open `Bootstrap.unity` → Press Play. Console logs `[Bootstrap] Step N/16: ...` for every pipeline step.
+
+Full Quick Start in the [package README](Packages/com.tnbao91.nobody.zero/README.md).
+
+---
+
+## Develop in this repo
+
+This repository is a Unity 6 LTS dev project that **embeds** the package at `Packages/com.tnbao91.nobody.zero/`. Clone, open, edit, test — Unity discovers the embedded package automatically.
+
+### Stack (locked, do not substitute)
 
 | Concern | Pick | Why over alternatives |
 |---|---|---|
@@ -13,13 +86,13 @@ Opensource greenfield Unity 6 LTS template for hybrid casual and puzzle games. M
 | Async | [UniTask](https://github.com/Cysharp/UniTask) | Zero-alloc, PlayerLoop-aware (not `Task<T>`) |
 | Reactive | [R3](https://github.com/Cysharp/R3) | Successor to UniRx, struct-based observables |
 | Tweening | [LitMotion](https://github.com/AnnulusGames/LitMotion) | Burst/jobs, fastest mobile tween (not DOTween) |
-| JSON | Newtonsoft.Json (NuGetForUnity) | Battle-tested, Unity package available |
+| JSON | `com.unity.nuget.newtonsoft-json` | Battle-tested, Unity-shipped (no NuGet for the JSON dep) |
 | String building | [ZString](https://github.com/Cysharp/ZString) | Zero-alloc string interpolation |
 | Localization | `com.unity.localization` | Wraps the official Unity package |
 | Notifications | `com.unity.mobile.notifications` | Wraps the official Unity Unified API |
 | Object pool | `UnityEngine.Pool.ObjectPool` | Wraps the built-in Unity pool |
 
-## Architecture
+### Architecture
 
 ```
 Zero.Core (interfaces, POCOs, cross-cutting events)
@@ -35,17 +108,36 @@ Zero.UI       Zero.Meta       Zero.Gameplay   ← peers, talk via IEventBus
 
 Gameplay/Meta/UI never reference each other directly — cross-tier coupling goes through `IEventBus` (impl `R3EventBus`). Composition root `Zero.Bootstrap` is the only asmdef that references all three peers. Full DAG diagram in [docs/architecture/asmdef-graph.md](docs/architecture/asmdef-graph.md).
 
-## Quick Start
+### Dev workspace Quick Start
 
-1. **Clone** the repository.
-2. **Open** the project in Unity 6.0.3.11f1 (matching `ProjectSettings/ProjectVersion.txt`). Do not let Unity upgrade the project on a different LTS.
-3. **Restore NuGet packages** if `Newtonsoft.Json` or R3 transitive deps are missing — `NuGet → Restore Packages` (NuGetForUnity menu). Patched plugin metas in this repo enable `Editor.enabled` for R3 + transitive deps; do not let NuGet revert those.
-4. **Create the encryption seed asset.** Copy `Assets/Resources/ZeroSecrets.asset.example` to `Assets/Resources/ZeroSecrets.asset`, open it in the Inspector, and replace the `REPLACE_ME_*` placeholder strings with random bytes. The new file is gitignored. Player builds throw on startup if it is missing or unconfigured. See [docs/security/save-encryption.md](docs/security/save-encryption.md).
-5. **Open `Assets/_Project/Scenes/Bootstrap.unity`** and press Play. The bootstrap pipeline log lines (`[Bootstrap] Step N/M: ...`) appear in the Console.
-6. **Run EditMode tests** via `Window → General → Test Runner` to verify the install. ~55 cases should be green.
-7. **Read `CLAUDE.md`** before extending — it indexes every footgun and convention. Pair with [docs/dev/PITFALLS.md](docs/dev/PITFALLS.md).
+1. **Clone**: `git clone https://github.com/tnbao91/unity_zero.git`.
+2. **Open** in Unity 6.0.3.11f1 (matching `ProjectSettings/ProjectVersion.txt`). Do not let Unity upgrade the project on a different LTS.
+3. **NuGet**: `NuGet → Restore Packages` (NuGetForUnity menu) for R3 BCL transitive deps. Patched plugin metas in this repo enable `Editor.enabled` for R3 + transitive deps; do not let NuGet revert those.
+4. **Encryption seed**: copy `Assets/Resources/ZeroSecrets.asset.example` to `ZeroSecrets.asset`, replace placeholders. Gitignored.
+5. **Open** `Assets/_Project/Scenes/Bootstrap.unity` → Press Play. Pipeline runs all 16 bootstrap steps.
+6. **Tests**: `Window → General → Test Runner`. ~78 EditMode cases should be green.
+7. **Read `CLAUDE.md`** before extending — it indexes every convention and footgun. Pair with [`docs/dev/PITFALLS.md`](docs/dev/PITFALLS.md).
 
-## Phase status
+### Repo layout
+
+```
+unity_zero/
+├── Assets/                         ← dev workspace (Bootstrap.unity, Resources, ProjectSettings)
+├── Packages/
+│   ├── manifest.json
+│   └── com.tnbao91.nobody.zero/    ← THE PACKAGE (Runtime, Tests, Samples~, Documentation~)
+├── docs/                           ← user-facing docs (rendered on GitHub)
+├── .github/                        ← workflows, templates
+├── README.md                       ← you are here
+├── CLAUDE.md                       ← contributor doc (not in package)
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+└── LICENSE
+```
+
+When editing the package: the dev `Assets/_Project/Scenes/Bootstrap.unity` is the canonical scene. Before tagging a release, copy changes to `Packages/com.tnbao91.nobody.zero/Samples~/BootstrapScene/Bootstrap.unity`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the sync convention.
+
+### Phase status
 
 All five build phases are complete and merged to `main`. See [docs/dev/JOURNAL.md](docs/dev/JOURNAL.md) for per-phase deltas + lessons learned.
 
@@ -55,8 +147,9 @@ All five build phases are complete and merged to `main`. See [docs/dev/JOURNAL.m
 | 2 | Real Input + Audio + Notification (wrap Unity packages) | Done |
 | 3 | UI scaffolding: popup stack, screens, transitions, toast, localized text, consumer-owned `UIRoot` | Done |
 | 4 | Gameplay scaffolding: state machine, level loader, lifecycle events, sample states | Done |
-| 5a | Live-Ops: VersionCheck service + bootstrap step. DevTools: cheat console + FPS overlay (gated to Editor / DEVELOPMENT_BUILD) | Done |
-| 5b | Cross-cutting docs: this README + LICENSE + CONTRIBUTING + 8 Mock SDK extension recipes + meta recipes | Done |
+| 5a | Live-Ops: VersionCheck service. DevTools: cheat console + FPS overlay (gated to Editor / DEVELOPMENT_BUILD) | Done |
+| 5b | Cross-cutting docs: README, LICENSE, CONTRIBUTING, 8 Mock SDK extension recipes, meta recipes | Done |
+| UPM | Restructure to UPM package layout for `git+https://...?path=Packages/...` install + OpenUPM publish | v0.1.0 |
 
 ## Documentation
 
@@ -70,7 +163,7 @@ All five build phases are complete and merged to `main`. See [docs/dev/JOURNAL.m
 - **Security** — [save encryption](docs/security/save-encryption.md).
 - **Testing** — [writing tests](docs/testing/writing-tests.md), [CI](docs/testing/ci.md), [manual checklist](docs/testing/manual-checklist.md).
 - **Meta recipes** (no impl ships) — [docs/meta/recipes.md](docs/meta/recipes.md).
-- **Dev** — [PLAN.md](docs/dev/PLAN.md), [JOURNAL.md](docs/dev/JOURNAL.md), [PITFALLS.md](docs/dev/PITFALLS.md).
+- **Dev (contributor only)** — [PLAN.md](docs/dev/PLAN.md), [JOURNAL.md](docs/dev/JOURNAL.md), [PITFALLS.md](docs/dev/PITFALLS.md).
 - **Vietnamese** — [README.vi.md](README.vi.md).
 
 ## CI Setup
