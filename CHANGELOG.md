@@ -2,6 +2,28 @@
 
 All notable template-level changes are recorded here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; per-phase deltas with file-level detail and bug retros live in [`docs/dev/JOURNAL.md`](docs/dev/JOURNAL.md).
 
+## [0.2.0] — 2026-05-10 — AI agent memory bundle
+
+Adds opt-in Sample bundle so Claude Code (and similar AI coding agents) can be productive in consumer projects without re-deriving conventions every session.
+
+### Added
+- `Samples~/ClaudeMemory/` package sample with:
+  - `CLAUDE.md` consumer-voice (extends package, doesn't modify it).
+  - `claude-context/architecture.md` — asmdef tier diagram, peer rule, DI flow, bootstrap order.
+  - `claude-context/available-services.md` — all ~28 service interfaces + signatures cheatsheet.
+  - `claude-context/extension-points.md` — 8 concrete recipes (swap mock SDK, add state, popup, cheat command, bootstrap step, persist data, custom service, lifecycle subscriptions).
+  - `claude-context/stack-constraints.md` — locked picks (Reflex/UniTask/R3/LitMotion/etc.) + pushback rules when AI suggests substitutes.
+  - `claude-context/pitfalls.md` — consumer-relevant subset of upstream `docs/dev/PITFALLS.md`.
+  - `.claude/settings.example.json` — permission skeleton for fewer prompts.
+  - `README.md` — usage flow for the sample.
+- `docs/dev/AGENT-WORKFLOW.md` — repo-side, documents the phase + subagent + lead-review pattern used to build the template.
+- `package.json` `samples` array gains the `ClaudeMemory` entry.
+- README sections (root + package) advertise the AI agent compatibility.
+
+### Notes
+- Claude-only scope for v0.2.0. Cross-tool support (`AGENTS.md`, Cursor rules, Copilot instructions) deferred until requested.
+- Two distinct AI surfaces: **repo-side** (`CLAUDE.md` + `docs/dev/`) for contributors developing the package, **consumer-side** (`Samples~/ClaudeMemory/`) for studios using the package in their game.
+
 ## [0.1.0] — 2026-05-10 — UPM package release
 
 Restructured from full-project template to embedded-package layout. Same v0 template features; new distribution mechanism.

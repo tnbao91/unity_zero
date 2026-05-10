@@ -2,6 +2,19 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; per-phase implementation deltas live in [`docs/dev/JOURNAL.md`](https://github.com/tnbao91/unity_zero/blob/main/docs/dev/JOURNAL.md) at the repo.
 
+## [0.2.0] — 2026-05-10
+
+Adds `Samples~/ClaudeMemory/` AI agent context bundle for Claude Code-assisted consumer development.
+
+### Added
+- `Samples~/ClaudeMemory/` — `CLAUDE.md` + `claude-context/` (architecture, available-services, extension-points, stack-constraints, pitfalls) + `.claude/settings.example.json`.
+- `package.json` registers the new sample.
+- README section advertises AI agent compatibility.
+
+### Notes
+- Consumer imports the sample, moves `CLAUDE.md` + `claude-context/` to their repo root. Claude Code auto-reads them at session start.
+- Claude-only scope. Cross-tool agent docs (`AGENTS.md`, Cursor rules, Copilot instructions) deferred.
+
 ## [0.1.0] — 2026-05-10
 
 Initial release as Unity Package Manager package. Restructured from full-project template to embedded-package layout for `git+https://...?path=Packages/...` install + OpenUPM publish. All v0 template features carried over from the prior project-based release.

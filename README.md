@@ -66,7 +66,11 @@ Or `Add package by name` → `com.tnbao91.nobody.zero`.
 - Move `ZeroSecrets.asset.example` to `Assets/Resources/`, rename to `ZeroSecrets.asset`.
 - Replace placeholder seeds in the Inspector with per-game random strings. Do **not** commit them.
 
-### 6. Press Play
+### 6. (Optional) Import Claude Memory sample for AI agents
+
+If you use Claude Code, also `Import "Claude Memory"` sample. Move the imported `CLAUDE.md` + `claude-context/` to your repo root. Claude Code auto-reads them at session start, so the agent knows your stack constraints, available services, extension recipes, and consumer-relevant pitfalls without re-deriving them every conversation. See [`Samples~/ClaudeMemory/README.md`](Packages/com.tnbao91.nobody.zero/Samples~/ClaudeMemory/README.md) inside the package.
+
+### 7. Press Play
 
 Open `Bootstrap.unity` → Press Play. Console logs `[Bootstrap] Step N/16: ...` for every pipeline step.
 
