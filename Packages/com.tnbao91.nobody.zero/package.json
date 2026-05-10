@@ -1,6 +1,6 @@
 {
   "name": "com.tnbao91.nobody.zero",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "displayName": "Zero — Hybrid Casual Template",
   "description": "Opinionated Unity 6 LTS template for hybrid casual / puzzle games. Reflex DI, UniTask, R3, LitMotion. ~28 services with mock-first defaults; peer Gameplay/UI/Meta layers cross-talk via IEventBus.",
   "unity": "6000.3",
@@ -26,6 +26,11 @@
       "displayName": "Bootstrap Scene",
       "description": "Reference Bootstrap.unity, ZeroSecrets.asset.example, ReflexSettings.asset, and packages.config (NuGet manifest for BCL transitive deps).",
       "path": "Samples~/BootstrapScene"
+    },
+    {
+      "displayName": "Claude Memory",
+      "description": "AI agent context bundle: CLAUDE.md, claude-context/ cheatsheets (architecture, available services, extension points, stack constraints, pitfalls), and .claude/settings.example.json. Move to your repo root after import to give Claude Code session-start context.",
+      "path": "Samples~/ClaudeMemory"
     }
   ],
   "keywords": ["template", "hybrid-casual", "puzzle", "reflex", "unitask", "r3", "litmotion", "addressables"],

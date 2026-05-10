@@ -60,6 +60,16 @@ Then:
 
 Open Bootstrap.unity → Press Play. Console logs `[Bootstrap] Step N/16: ...` for each pipeline step.
 
+## AI agent compatibility
+
+This template is designed for AI-agent-assisted development. If you use Claude Code (or similar coding agents), import the **Claude Memory** sample alongside Bootstrap Scene:
+
+`Package Manager → Zero → Samples → Import "Claude Memory"`.
+
+Move `CLAUDE.md` + `claude-context/` from `Assets/Samples/com.tnbao91.nobody.zero/<version>/ClaudeMemory/` to your repo root. Claude Code will auto-read them at session start, giving it: stack constraints (locked Reflex/UniTask/R3/LitMotion), architecture cheatsheet, ~28 service interfaces, extension recipes, and consumer-relevant pitfalls. Saves the agent from re-deriving conventions every conversation.
+
+Full readme inside the sample bundle.
+
 ## Documentation
 
 Full docs at the repo: <https://github.com/tnbao91/unity_zero/tree/main/docs>
