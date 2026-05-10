@@ -19,6 +19,9 @@ This repository serves two audiences:
 
 ## Install via Package Manager
 
+> ⚠️ **Minimum installable version: `0.2.1`.** Tags `v0.1.0` and `v0.2.0` ship with a missing `Runtime/Services/Log/` folder (a global `.gitignore` collision on the dev machine silently dropped 6 files during the v0.1.0 restructure; v0.2.1 hotfix restored them and added a negation rule). They will not compile. Always pin `0.2.1` or later.
+
+
 ### 1. Add scoped registries
 
 In your project's `Packages/manifest.json`:

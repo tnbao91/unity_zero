@@ -1,5 +1,9 @@
 # Zero — Hybrid Casual Template (UPM)
 
+> ⚠️ **Minimum version: `0.2.1`.** Tags `v0.1.0` and `v0.2.0` ship with a missing `Runtime/Services/Log/` folder (lost during the initial UPM restructure due to a global gitignore collision on the dev machine). They WILL fail to compile. Always install `0.2.1` or later.
+
+
+
 Opinionated Unity 6 LTS template for hybrid casual and puzzle games. Stack: Reflex DI · UniTask · R3 · LitMotion · Addressables · Newtonsoft · ZString · New Input System. ~28 services with mock-first defaults so the template runs end-to-end on a fresh clone; swap mocks per-game in installer files.
 
 > **Meta layer (wallet / progression / rewards) is intentionally out of scope** — hybrid casual and puzzle have different meta loops. See [`docs/meta/recipes.md`](https://github.com/tnbao91/unity_zero/tree/main/docs/meta/recipes.md) for per-game patterns.
