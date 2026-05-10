@@ -4,6 +4,14 @@ on:
   push:
   pull_request:
 
+# game-ci/unity-test-runner posts test results as a GitHub Check (uses
+# `checks: write`); it also needs `contents: read` for the checkout. Without
+# these, the action runs the test suite successfully but fails at "Posting
+# results" with "Resource not accessible by integration".
+permissions:
+  contents: read
+  checks: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
