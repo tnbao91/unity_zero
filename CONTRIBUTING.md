@@ -47,6 +47,19 @@ The template ships mock implementations for Crashlytics, Consent, RemoteConfig, 
 
 Conventional commits: `feat(<scope>)`, `fix(<scope>)`, `refactor(<scope>)`, `test(<scope>)`, `docs(<scope>)`, `chore(<scope>)`. The scope matches the asmdef stem (`gameplay`, `ui`, `versioncheck`, `devtools`, `audio`, etc.). Multi-line bodies explain *why*, not what — the diff already shows what.
 
+## Sample sync convention
+
+The package ships a `Samples~/BootstrapScene/` bundle that mirrors the dev workspace's canonical assets. Because `Samples~/` ends in `~`, Unity ignores it during dev (so the dev project keeps its own `Assets/_Project/Scenes/Bootstrap.unity` and `Assets/Resources/{ReflexSettings,ZeroSecrets.asset.example}.asset`).
+
+When you change any of the canonical assets, copy them to `Packages/com.tnbao91.nobody.zero/Samples~/BootstrapScene/` **before tagging a release**. Files to keep in sync:
+
+- `Assets/_Project/Scenes/Bootstrap.unity` (+ `.meta`)
+- `Assets/Resources/ZeroSecrets.asset.example` (+ `.meta`)
+- `Assets/Resources/ReflexSettings.asset` (+ `.meta`)
+- `Assets/packages.config`
+
+Forgetting to sync means consumers who Import the sample get a stale Bootstrap scene. A pre-tag lint script can be added in a future phase.
+
 ## Phase workflow
 
 Larger work is staged as phases per `docs/dev/PLAN.md`. The flow is:

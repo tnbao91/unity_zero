@@ -1,4 +1,7 @@
 {
+  "testables": [
+    "com.tnbao91.nobody.zero"
+  ],
   "scopedRegistries": [
     {
       "name": "OpenUPM",

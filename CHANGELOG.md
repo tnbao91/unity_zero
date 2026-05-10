@@ -2,6 +2,26 @@
 
 All notable template-level changes are recorded here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; per-phase deltas with file-level detail and bug retros live in [`docs/dev/JOURNAL.md`](docs/dev/JOURNAL.md).
 
+## [0.1.0] — 2026-05-10 — UPM package release
+
+Restructured from full-project template to embedded-package layout. Same v0 template features; new distribution mechanism.
+
+### Added
+- `Packages/com.tnbao91.nobody.zero/` — UPM package containing all Runtime + Tests + a `Samples~/BootstrapScene` bundle (Bootstrap.unity, ZeroSecrets.asset.example, ReflexSettings.asset, packages.config).
+- Repo serves both as embedded-package dev workspace AND consumer-installable package source.
+- `package.json` declares 11 OpenUPM/Unity dependencies.
+- README rewritten with two install paths: UPM-via-git-URL for consumers, clone-dev-workspace for contributors.
+
+### Changed
+- `Assets/_Project/Scripts/Runtime/` → `Packages/com.tnbao91.nobody.zero/Runtime/` (~29 asmdefs, all `.cs.meta` GUIDs preserved via `git mv`).
+- `Assets/_Project/Scripts/Tests/` → `Packages/com.tnbao91.nobody.zero/Tests/`.
+- `Assets/_Project/Scripts/Editor/` → `Packages/com.tnbao91.nobody.zero/Editor/` (empty asmdef placeholder).
+- Dev `Packages/manifest.json` adds `"testables": ["com.tnbao91.nobody.zero"]` so Test Runner picks up package tests in dev. Consumer installs do NOT inherit this — tests stay hidden in consumer's Editor.
+
+### Notes
+- BCL transitive deps for R3 (`Microsoft.Bcl.AsyncInterfaces`, `Microsoft.Bcl.TimeProvider`, `System.ComponentModel.Annotations`, `System.Threading.Channels`) require NuGetForUnity prereq; not bundled to avoid duplicate-DLL conflicts when consumer follows R3's OpenUPM README.
+- `Documentation~/` ships only an index pointing to GitHub; full docs live in `docs/` at repo root.
+
 ## [Unreleased] — v0 template
 
 This is the initial template release. There is no v1 yet — consumers fork and build their game from this baseline.
