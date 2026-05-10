@@ -84,3 +84,11 @@ Thumbs.db
 !Packages/**/Documentation~/**
 !Packages/**/Samples~/
 !Packages/**/Samples~/**
+
+# Override global "log" pattern for Zero.Services.Log asmdef folder.
+# Some users have lowercase "log" in their global gitignore for log files —
+# on case-insensitive filesystems (macOS default) it accidentally matches the Log/ folder
+# that contains LogService + asmdef. Without this negation, `git mv` silently drops the
+# folder contents during refactors, breaking CI compile on case-sensitive Linux.
+!Packages/**/Services/Log/
+!Packages/**/Services/Log/**

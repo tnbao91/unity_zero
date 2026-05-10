@@ -1,0 +1,19 @@
+{
+    "name": "Zero.Services.Log",
+    "rootNamespace": "Zero.Services.Log",
+    "references": [
+        "Zero.Core",
+        "Zero.Infrastructure",
+        "UniTask",
+        "Reflex"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
