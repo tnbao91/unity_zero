@@ -2,6 +2,17 @@
 
 All notable template-level changes are recorded here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; per-phase deltas with file-level detail and bug retros live in [`docs/dev/JOURNAL.md`](docs/dev/JOURNAL.md).
 
+## [0.2.1] — 2026-05-10 — Hotfix: restore Log/ asmdef
+
+CI on case-sensitive Linux exposed that `git mv` during the v0.1.0 UPM restructure silently dropped 6 files in `Runtime/Services/Log/` (LogService, LogServiceInstaller, asmdef + metas). Cause: dev machine's global `~/.gitignore_global` had a lowercase `log` pattern that matched the `Log/` folder name on case-insensitive macOS. Local Library/ScriptAssemblies cache hid the breakage; clean Linux clone exposed it.
+
+### Fixed
+- Restored 6 missing `Runtime/Services/Log/` files. `Zero.Services.Log` namespace + asmdef are back; `ProjectScopeInstaller.cs` line 20 (`using Zero.Services.Log;`) compiles again.
+- `.gitignore` adds negation `!Packages/**/Services/Log/**` to prevent recurrence — same class of fix as the earlier `Documentation~`/`Samples~` negations for the `*~` pattern.
+
+### Note
+- v0.1.0 and v0.2.0 tags ship with the broken state and should NOT be installed. v0.2.1 is the first installable release.
+
 ## [0.2.0] — 2026-05-10 — AI agent memory bundle
 
 Adds opt-in Sample bundle so Claude Code (and similar AI coding agents) can be productive in consumer projects without re-deriving conventions every session.

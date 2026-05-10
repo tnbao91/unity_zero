@@ -2,6 +2,10 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; per-phase implementation deltas live in [`docs/dev/JOURNAL.md`](https://github.com/tnbao91/unity_zero/blob/main/docs/dev/JOURNAL.md) at the repo.
 
+## [0.2.1] — 2026-05-10
+
+Hotfix: restore `Runtime/Services/Log/` folder (6 files) lost during the v0.1.0 UPM restructure due to a global gitignore `log` pattern collision on case-insensitive macOS. v0.1.0 and v0.2.0 ship with the broken state and should NOT be installed; v0.2.1 is the first installable release. `.gitignore` now negates the path to prevent recurrence.
+
 ## [0.2.0] — 2026-05-10
 
 Adds `Samples~/ClaudeMemory/` AI agent context bundle for Claude Code-assisted consumer development.
