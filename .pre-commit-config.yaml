@@ -1,0 +1,60 @@
+# Pre-commit hooks for the Zero template.
+# Setup: `pip install pre-commit && pre-commit install` (run once after clone).
+# Run on all files: `pre-commit run --all-files`.
+# CI mirrors this in .github/workflows/lint.yml — bypassing locally with
+# `--no-verify` will still be caught by CI.
+#
+# We do NOT lint Unity-generated or vendored content: `.meta` files (Unity
+# regenerates them), `.asset`/`.inputactions` (Unity-serialized YAML),
+# `Assets/Packages/` (NuGetForUnity-vendored binaries + nuspec/xml docs),
+# `Assets/AddressableAssetsData/` (Unity-managed config), `ProjectSettings/`
+# (Unity-managed), and the Library/Temp/Logs caches.
+
+exclude: |
+  (?x)^(
+    Assets/Packages/.*|
+    Assets/AddressableAssetsData/.*|
+    ProjectSettings/.*|
+    Library/.*|
+    Temp/.*|
+    Logs/.*|
+    UserSettings/.*|
+    .*\.meta|
+    .*\.asset|
+    .*\.inputactions|
+    .*\.unity|
+    .*\.prefab|
+    .*\.mat|
+    .*\.controller|
+    .*\.anim
+  )$
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$  # markdown allows trailing whitespace for hard line breaks
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-json
+        # *.csproj.meta etc. are not JSON; only true JSON files.
+        files: \.json$
+      - id: check-added-large-files
+        args: [--maxkb=2048]  # block >2MB blobs from sneaking in (LFS lives separately)
+      - id: check-case-conflict
+
+  # dotnet format runs only when a solution/csproj is already generated.
+  # Unity regenerates *.sln / *.csproj on Editor open; on a fresh clone they
+  # do not exist yet and the hook would fail. Guard with a shell test.
+  - repo: local
+    hooks:
+      - id: dotnet-format-whitespace
+        name: dotnet format whitespace (if .sln present)
+        entry: scripts/dotnet-format-if-sln.sh
+        language: script
+        pass_filenames: false
+        files: \.cs$

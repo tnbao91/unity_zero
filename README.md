@@ -125,6 +125,19 @@ Gameplay/Meta/UI never reference each other directly — cross-tier coupling goe
 6. **Tests**: `Window → General → Test Runner`. ~78 EditMode cases should be green.
 7. **Read `CLAUDE.md`** before extending — it indexes every convention and footgun. Pair with [`docs/dev/PITFALLS.md`](docs/dev/PITFALLS.md).
 
+### Pre-commit hooks
+
+Lint + formatting hygiene is enforced by the [`pre-commit`](https://pre-commit.com) framework. **Run once after clone:**
+
+```bash
+pip install pre-commit   # or: brew install pre-commit
+pre-commit install
+```
+
+From then on, every `git commit` runs the hooks in [`.pre-commit-config.yaml`](.pre-commit-config.yaml): trailing whitespace, EOL normalization, YAML/JSON validation, merge-conflict markers, large-file guard, and `dotnet format whitespace --verify-no-changes` (auto-skipped on fresh clone until Unity regenerates `*.sln`). Style rules live in [`.editorconfig`](.editorconfig); dead-code diagnostics (`IDE0051`, `IDE0052`, `CS0414`, `CS0219`) are set to `error` severity. CI mirrors the same hooks in [`.github/workflows/lint.yml`](.github/workflows/lint.yml), so bypassing locally with `--no-verify` will still be caught.
+
+> Roslyn analyzer DLLs (Meziantou.Analyzer / Microsoft.CodeAnalysis.NetAnalyzers) for full dead-code detection are a separate, Unity-Editor step — see [`docs/dev/PITFALLS.md`](docs/dev/PITFALLS.md) "Plugin metas" before installing.
+
 ### Repo layout
 
 ```

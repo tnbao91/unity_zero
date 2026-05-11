@@ -1,0 +1,43 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{yml,yaml,json,md}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+indent_size = 4
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_style_namespace_declarations = file_scoped:suggestion
+csharp_prefer_braces = true:suggestion
+
+# Dead-code / unused-symbol diagnostics
+# These are blockers — failing CI on these is the whole point of the lint setup.
+# IDE0051 / IDE0052 need an IDE-style analyzer to be loaded (Roslyn IDE features
+# or Microsoft.CodeAnalysis.NetAnalyzers via Assets/Plugins/Analyzers/). Until
+# that ships (Phase 2), only CS* compiler diagnostics will actually fire.
+dotnet_diagnostic.IDE0051.severity = error    # unused private member
+dotnet_diagnostic.IDE0052.severity = error    # unread private member
+dotnet_diagnostic.CS0414.severity  = error    # field assigned but never used
+dotnet_diagnostic.CS0219.severity  = error    # variable assigned but never used
+dotnet_diagnostic.CS0168.severity  = warning  # variable declared but never used
+dotnet_diagnostic.IDE0005.severity = warning  # unnecessary using directive
+
+# Style suggestions — keep as suggestion, not error, to avoid gate churn early on.
+dotnet_diagnostic.IDE0011.severity = suggestion  # add braces
+dotnet_diagnostic.IDE0040.severity = suggestion  # accessibility modifier
+
+[*.{asmdef,asmref}]
+indent_size = 2
