@@ -2,6 +2,16 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; per-phase implementation deltas live in [`docs/dev/JOURNAL.md`](https://github.com/tnbao91/unity_zero/blob/main/docs/dev/JOURNAL.md) at the repo.
 
+## [0.2.2] — 2026-05-12
+
+Documentation restructure — no runtime / API changes. Safe drop-in upgrade.
+
+### Changed
+- `Samples~/ClaudeMemory/CLAUDE.md` slimmed from 113 → 55 lines. Now a constitution (principles + anti-patterns + references); cheatsheets that duplicated `claude-context/*` removed. Consumers re-importing the sample get the leaner version.
+
+### Notes
+- No `Runtime/` or `Tests/` changes. Existing consumer code keeps working unchanged.
+
 ## [0.2.1] — 2026-05-10
 
 Hotfix: restore `Runtime/Services/Log/` folder (6 files) lost during the v0.1.0 UPM restructure due to a global gitignore `log` pattern collision on case-insensitive macOS. v0.1.0 and v0.2.0 ship with the broken state and should NOT be installed; v0.2.1 is the first installable release. `.gitignore` now negates the path to prevent recurrence.

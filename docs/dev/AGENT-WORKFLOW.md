@@ -5,6 +5,21 @@ This template was developed largely with Claude Code as a pair-programming partn
 > **Audience:** contributors developing **the package itself**.
 > **Not for** consumers using the package in their game — that's `Samples~/ClaudeMemory/CLAUDE.md`.
 
+## Agent tier ladder
+
+The repo ships named sub-agents under `.claude/agents/`. Pick the tier that matches the task; specialists auto-trigger on diff review.
+
+| Tier | Agent | Use for | Don't use for |
+|---|---|---|---|
+| Architecture | `unity-lead` (opus) | Phase planning, breaking-change decisions, alternative selection (RegisterType vs RegisterFactory, real impl vs mock), phase-close audit (JOURNAL + CLAUDE sync). | Routine feature work (delegate to senior); boilerplate (delegate to scaffolder/junior). |
+| Feature implementation | `unity-senior` (sonnet) | End-to-end feature: new service following 5-step convention, bootstrap step, single-module refactor, docs co-located with service, EditMode/PlayMode tests. | Architecture decisions (escalate to lead); pure scaffolding (delegate to scaffolder). |
+| One-file scaffolding | `unity-junior` (haiku) | Lint/format fixes, NUnit test stubs, CHANGELOG entries, single-file sync from clear spec, `Mock<Name>Service` shells. | Cross-asmdef changes; new service end-to-end; architecture. |
+| Specialists | `service-scaffolder` (haiku) | Scaffold a new service end-to-end from a name + summary, following the 5-step convention exactly. Senior fills real logic after. | Fixing existing services; designing behavior. |
+| Specialists | `asmdef-boundary-reviewer` (sonnet, read-only) | Pre-merge diff review for peer-rule violations, missing transitive refs, `autoReferenced` regressions. | Editing code. |
+| Specialists | `pitfalls-guard` (sonnet, read-only) | Pre-merge diff review against `docs/dev/PITFALLS.md` for re-occurring footguns. | Editing code. |
+
+Consumer-side mirror set ships in `Packages/com.tnbao91.nobody.zero/Samples~/ClaudeMemory/.claude/agents/` — `game-lead`/`game-senior`/`game-junior` + the same three specialists tuned for consumer scope (no edits inside `Packages/com.tnbao91.nobody.zero/**`; consumer wiring goes through `ProjectScopeInstaller.UserServices.cs` partial).
+
 ## Phase + subagent pattern
 
 Larger work is staged as **phases** per `PLAN.md` §3 and `JOURNAL.md`. The proven flow:

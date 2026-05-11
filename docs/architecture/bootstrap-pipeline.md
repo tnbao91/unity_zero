@@ -4,6 +4,12 @@
 
 The bootstrap pipeline is a **sequential, resilient startup sequence** that initializes all services from a single, reorderable list. Each step (Crashlytics, Save, Assets, Localization, Ads, etc.) is optional, has configurable timeout/retry/criticality, and reports progress to a `IBootstrapProgressReporter` for UI display. Steps that fail non-critically are logged but don't block launch; critical steps abort the entire pipeline.
 
+## How the root container is built
+
+The Reflex root scopes list in `Assets/Resources/ReflexSettings.asset` is **intentionally empty**. The root container is built imperatively from `ProjectScopeInstaller.Hook()`, which is registered with `[RuntimeInitializeOnLoadMethod(BeforeSceneLoad)]` and subscribes to `ContainerScope.OnRootContainerBuilding`. On the build event, `InstallBindings` calls each `<Service>ServiceInstaller.Install(builder)` and registers a `BootstrapPipeline` factory with `Lifetime.Singleton, Resolution.Lazy`. The Bootstrap scene's `GameLauncher` MonoBehaviour (`[DefaultExecutionOrder(-100)]`) gets `[Inject]`-ed and runs the pipeline in `Start()`.
+
+Do not add scopes to the `ReflexSettings.asset` list expecting it to fire — the wiring is in code, not data.
+
 ## Public API
 
 ```csharp

@@ -22,8 +22,6 @@ You are the **Senior Unity Developer** for the Unity Zero template. You execute 
 - Tests: `Packages/com.tnbao91.nobody.zero/Tests/{EditMode,PlayMode}/`
 - Docs: `docs/services/<name>.md` co-located with the repo, not the package
 
-Note: `Assets/_Project/Scripts/Runtime/...` is the OLD path before the great move-to-package refactor. CLAUDE.md still references it in places — always prefer `Packages/com.tnbao91.nobody.zero/Runtime/...`.
-
 ## 5-step service convention (match exactly)
 
 1. `Runtime/Core/Interfaces/I<Name>Service.cs` (namespace `Zero.Core`)

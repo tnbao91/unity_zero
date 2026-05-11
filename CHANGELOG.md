@@ -2,6 +2,25 @@
 
 All notable template-level changes are recorded here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; per-phase deltas with file-level detail and bug retros live in [`docs/dev/JOURNAL.md`](docs/dev/JOURNAL.md).
 
+## [0.2.2] — 2026-05-12 — Docs: CLAUDE.md as constitution
+
+Repo-wide documentation pass. Re-anchors `CLAUDE.md` as a constitution (principles + anti-patterns + references) rather than an index. No runtime / package API changes — safe drop-in.
+
+### Changed
+- `CLAUDE.md` rewritten (120 → 97 lines): drops the "Things that are easy to miss" cheatsheet and per-service "Mock-first defaults" details — those live in `docs/dev/PITFALLS.md` and `docs/services/<name>.md` already. Adds testing philosophy (behavior-anchored over snapshot, coverage thresholds CI-only), debug philosophy (phenomenon → hypothesis → test → fix; `git log --grep` before re-fixing), and the automated-gate references (`.github/workflows/lint.yml` + `tests.yml` + `.pre-commit-config.yaml`).
+- `Packages/com.tnbao91.nobody.zero/Samples~/ClaudeMemory/CLAUDE.md` slimmed from 113 → 55 lines on the same principle — cheatsheets pushed to `claude-context/*.md`.
+- `docs/architecture/bootstrap-pipeline.md` adds an explicit "How the root container is built" section (ReflexSettings.asset is intentionally empty; wiring is in code via `OnRootContainerBuilding`).
+- `docs/gameplay/state-machine.md` Design Rationale adds the "why genre-agnostic" rule for `Zero.Gameplay`.
+- `docs/dev/AGENT-WORKFLOW.md` gains an explicit Agent tier ladder table (lead / senior / junior / specialists) for both maintainer and consumer agent sets.
+- `.claude/agents/{unity-lead,pitfalls-guard,asmdef-boundary-reviewer}.md` + the consumer mirror under `Samples~/ClaudeMemory/.claude/agents/` clarify source-of-truth (`CLAUDE.md` + `PITFALLS.md`) vs operational catalog.
+- `README.md` description of `CLAUDE.md` updated to match the new framing.
+
+### Removed
+- `README.vi.md`. English-only going forward — the Vietnamese pitch is no longer maintained.
+
+### Notes
+- Package `0.2.2` ships the consumer-side CLAUDE.md slim; rest is repo-side (contributor surface only).
+
 ## [0.2.1] — 2026-05-10 — Hotfix: restore Log/ asmdef
 
 CI on case-sensitive Linux exposed that `git mv` during the v0.1.0 UPM restructure silently dropped 6 files in `Runtime/Services/Log/` (LogService, LogServiceInstaller, asmdef + metas). Cause: dev machine's global `~/.gitignore_global` had a lowercase `log` pattern that matched the `Log/` folder name on case-insensitive macOS. Local Library/ScriptAssemblies cache hid the breakage; clean Linux clone exposed it.

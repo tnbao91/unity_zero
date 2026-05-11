@@ -123,7 +123,7 @@ Gameplay/Meta/UI never reference each other directly — cross-tier coupling goe
 4. **Encryption seed**: copy `Assets/Resources/ZeroSecrets.asset.example` to `ZeroSecrets.asset`, replace placeholders. Gitignored.
 5. **Open** `Assets/_Project/Scenes/Bootstrap.unity` → Press Play. Pipeline runs all 16 bootstrap steps.
 6. **Tests**: `Window → General → Test Runner`. ~78 EditMode cases should be green.
-7. **Read `CLAUDE.md`** before extending — it indexes every convention and footgun. Pair with [`docs/dev/PITFALLS.md`](docs/dev/PITFALLS.md).
+7. **Read `CLAUDE.md`** before extending — it's the project constitution (principles + anti-patterns + references). Module detail lives in `docs/`; footguns in [`docs/dev/PITFALLS.md`](docs/dev/PITFALLS.md).
 
 ### Pre-commit hooks
 
@@ -183,8 +183,7 @@ All five build phases are complete and merged to `main`. See [docs/dev/JOURNAL.m
 - **Security** — [save encryption](docs/security/save-encryption.md).
 - **Testing** — [writing tests](docs/testing/writing-tests.md), [CI](docs/testing/ci.md), [manual checklist](docs/testing/manual-checklist.md).
 - **Meta recipes** (no impl ships) — [docs/meta/recipes.md](docs/meta/recipes.md).
-- **Dev (contributor only)** — [PLAN.md](docs/dev/PLAN.md), [JOURNAL.md](docs/dev/JOURNAL.md), [PITFALLS.md](docs/dev/PITFALLS.md).
-- **Vietnamese** — [README.vi.md](README.vi.md).
+- **Dev (contributor only)** — [PLAN.md](docs/dev/PLAN.md), [JOURNAL.md](docs/dev/JOURNAL.md), [PITFALLS.md](docs/dev/PITFALLS.md), [AGENT-WORKFLOW.md](docs/dev/AGENT-WORKFLOW.md).
 
 ## CI Setup
 

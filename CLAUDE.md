@@ -1,120 +1,97 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (claude.ai/code) when working in this repo.
+
+> **This file is a constitution.** Only principles + anti-patterns + references. Module details live in `docs/`; footgun cheatsheet lives in `docs/dev/PITFALLS.md`. Before adding a sentence here, ask: *"Is this an invariant principle, or a module detail?"* If detail, put it in the right doc and link.
 
 ## Project
 
-Unity 6 LTS (`6000.3.11f1`) greenfield template for hybrid casual games. Single bootstrap scene at `Assets/_Project/Scenes/Bootstrap.unity`. URP, Input System (new), Addressables, IAP, NuGetForUnity.
+Unity 6 LTS (`6000.3.11f1`) greenfield template for hybrid casual games. Single bootstrap scene at `Assets/_Project/Scenes/Bootstrap.unity`. URP, new Input System, Addressables, IAP, NuGetForUnity. Runtime code lives in `Packages/com.tnbao91.nobody.zero/Runtime/` (the package); `Assets/_Project/` is the consumer-side host project.
 
-## Stack (deliberate choices — do not substitute)
+## Stack (locked — do not substitute)
 
-- **DI**: Reflex (not Zenject/VContainer)
-- **Async**: UniTask (not Task<T> for game code)
-- **Reactive**: R3 (not UniRx)
-- **Tweening**: LitMotion (not DOTween)
-- **JSON**: Newtonsoft.Json via NuGetForUnity
-- **String building**: ZString
+| Concern | Choice | Not |
+|---|---|---|
+| DI | Reflex | Zenject, VContainer |
+| Async | UniTask | `Task<T>` for game code |
+| Reactive | R3 | UniRx |
+| Tweening | LitMotion | DOTween |
+| JSON | Newtonsoft.Json (NuGetForUnity) | — |
+| Strings | ZString | — |
 
-Packages come from OpenUPM (Cysharp/AnnulusGames/Reflex) plus Unity registry. NuGet packages are listed in `Assets/packages.config` and managed by NuGetForUnity.
+Substitution suggestions are rejected on sight. The user picked these deliberately.
 
-## Architecture
+## Core principles
 
-The codebase is split into ~24 assembly definitions enforcing a strict dependency direction. **Gameplay/Meta/UI are peers** — they never reference each other; they cross-talk only through `IEventBus` (Phase 1a, see `docs/dev/PLAN.md` §2.1).
+- **Service convention (5 steps).** Every service: interface in `Runtime/Core/Interfaces/I<Name>Service.cs` (namespace `Zero.Core`) → sealed impl in `Runtime/Services/<Name>/` with own `Zero.Services.<Name>.asmdef` → `<Name>ServiceInstaller` static class → optional `<Name>Step : BootstrapStepBase` → wire into `ProjectScopeInstaller.InstallBindings` (call `Install` + add step to `steps[]` in correct position). Reference impls: `LocalizationServiceInstaller`, `VersionCheckServiceInstaller` (the latter shows `RegisterFactory` for ctors with primitives).
+- **Asmdef boundaries.** `Zero.Core` holds interfaces + POCOs only; never references service impls. `Zero.Gameplay`, `Zero.Meta`, `Zero.UI` are **peers** — they never reference each other. Cross-tier coupling goes through `IEventBus` only.
+- **Sealed services + interface seams.** Every impl is `sealed`. Extension is by swapping the binding (in `<Name>ServiceInstaller` or a consumer's `ProjectScopeInstaller.UserServices.cs` partial) or by decorator-wrapping. Never document "subclass and override".
+- **Mock-first defaults.** Third-party SDK integrations ship as `Mock<Name>Service`. Real adapters replace the binding per-game. Real impls already in the template wrap Unity-shipped packages (Localization, Mobile Notifications, ObjectPool, Audio Mixer, IAP). Details + key conventions per service in `docs/services/<name>.md`.
+- **Gameplay is genre-agnostic.** `Zero.Gameplay` ships only state-machine + level-loading scaffolds + lifecycle events. Grid/runner/idle/merge/match-3 systems are out of scope — they live in the consumer's game asmdef.
+- **Consumer owns scenes and UI roots.** Only `Bootstrap.unity` is in build settings. UI layer canvases are not spawned by the framework — consumer attaches a `UIRoot` MonoBehaviour with 4 Transform slots. Loading screens, popups, screens, toasts are loaded by Addressables key conventions (`ui/popup/<name>`, etc.) provided by the consumer.
 
-```
-Zero.Core (interfaces, POCOs, cross-cutting events; references UniTask + R3)
-   ↑
-Zero.Infrastructure (BootstrapStepBase + BootstrapProgressReporter)
-   ↑
-Zero.Services.<Name>  (one asmdef per service; includes Zero.Services.Events, Zero.Services.Localization)
-   ↑          ↑          ↑
-Zero.UI   Zero.Meta   Zero.Gameplay   ← peers, talk via IEventBus
-        ↘     ↓     ↙
-      Zero.Bootstrap (composition root, references every service + every peer)
-```
+## Testing principles
 
-`Zero.Core` only holds interfaces (`I*Service`) and POCOs. Services never reference each other directly — they cross-talk through interfaces resolved from the Reflex container. Cross-asmdef domain events go through `IEventBus` (impl `R3EventBus` in `Zero.Services.Events`); typed `Subject<T>` per event type, no direct subscriber/publisher coupling.
+- **Behavior-anchored, not snapshot.** A test that asserts a consumer-facing behavior (`IBootstrapProgressReporter` emits progress in the right order when a step retries; gestures fire at the documented thresholds; save round-trips through encryption + tamper-reset) earns its weight. A test that instantiates a MonoBehaviour and asserts non-null does not.
+- **Coverage philosophy.** Coverage thresholds, if any, are enforced in CI (`.github/workflows/tests.yml`), never in the local dev gate. Don't optimize the coverage number; optimize for *"would this test catch a real regression?"*. 100% from snapshot-style tests is worthless; 60% from behavior-anchored tests is solid.
+- **Async EditMode test pattern.** `[UnityTest] public IEnumerator Foo() => UniTask.ToCoroutine(async () => { ... });`. NUnit's `[Test]` does not await `UniTask` — assertions run before the body completes. Pure-sync tests may keep `[Test]`.
 
-### DI bootstrap flow
+## Debug philosophy
 
-1. `ProjectScopeInstaller.Hook()` is registered with `[RuntimeInitializeOnLoadMethod(BeforeSceneLoad)]` and subscribes to `ContainerScope.OnRootContainerBuilding`.
-2. On container build, it calls each `<Service>ServiceInstaller.Install(builder)` to register that service's binding.
-3. It registers a `BootstrapPipeline` factory with `Lifetime.Singleton, Resolution.Lazy` — the **explicit step list** in `ProjectScopeInstaller.InstallBindings` defines bootstrap order. Reorder there, not by DI rediscovery.
-4. In the Bootstrap scene, a `GameLauncher` MonoBehaviour (`[DefaultExecutionOrder(-100)]`) gets `[Inject]`-ed and runs the pipeline in `Start()`.
+- **Phenomenon → hypothesis → test → fix.** When chasing a bug: state the observed phenomenon, form a hypothesis, write an EditMode/PlayMode test that *would fail iff the hypothesis is true*, confirm it fails, then fix until it passes. A green test without a prior red is not evidence.
+- **Git history is memory.** Before fixing, `git log --grep="<keyword>"` and look at the diff for similar fixes. Many bugs are regressions of past fixes — don't re-pay the cost.
+- **Same-shape sweep after a fix.** When you find one occurrence of a footgun, grep for the rest. Phase 4 round 2 found three test files all missing `using R3;` together.
 
-### Bootstrap steps
+## Automated gate before PR
 
-Each step extends `BootstrapStepBase` (in `Zero.Infrastructure`) and declares `Name`, `IsCritical`, and optionally overrides `Timeout` (default 30s) and `MaxRetries` (default 1). Pipeline behavior:
+- `.github/workflows/lint.yml` (CI) + `.pre-commit-config.yaml` (local) — formatting, EOL, basic static checks.
+- `.github/workflows/tests.yml` (CI) — Unity Test Runner EditMode + PlayMode headless via `game-ci`.
+- Both must be green before merge. Never bypass `--no-verify` / `--no-gpg-sign` unless the user explicitly asks.
+- AI-side review: spawn `asmdef-boundary-reviewer` + `pitfalls-guard` on the diff before opening the PR.
 
-- Steps run **sequentially** in the order defined in `ProjectScopeInstaller`.
-- Each step runs inside a linked CTS that fires `CancelAfter(step.Timeout)`.
-- Non-critical steps that throw (other than `OperationCanceledException` from the outer token) are retried up to `MaxRetries` times, then logged + swallowed.
-- If `IsCritical = true` and the step throws after retries, the pipeline aborts. Currently only `CrashlyticsStep` is critical.
-- `OperationCanceledException` from the outer (caller) token always propagates; timeout cancellation is treated as a step failure subject to retry policy.
-- Per-step progress is sliced into the overall pipeline progress and written to `IBootstrapProgressReporter` (Singleton in `Zero.Infrastructure`). Pipeline writes; `LoadingScreenView` and any HUD progress UI read. Never resolve `BootstrapPipeline` directly from a view — read from the reporter to avoid the Lazy-singleton resolution race.
+## Anti-patterns (do not)
 
-### Service convention
-
-Every service follows the same shape — match it when adding new ones:
-
-1. Interface in `Assets/_Project/Scripts/Runtime/Core/Interfaces/I<Name>Service.cs` (namespace `Zero.Core`).
-2. Implementation in `Assets/_Project/Scripts/Runtime/Services/<Name>/` with its own `Zero.Services.<Name>.asmdef`.
-3. `<Name>ServiceInstaller` static class with `Install(ContainerBuilder builder)` — almost always a single `RegisterType` call with `Lifetime.Singleton, Resolution.Lazy`.
-4. If it needs initialization at startup, a `<Name>Step : BootstrapStepBase` in `Assets/_Project/Scripts/Runtime/Bootstrap/Steps/`.
-5. Wire it in `ProjectScopeInstaller.InstallBindings`: add the `Install(builder)` call, then add the step to the `steps` array in the correct position.
-
-### Mock-first template defaults
-
-Most third-party SDK integrations (Ads, IAP, Analytics, Crashlytics, RemoteConfig, Attribution, Consent) ship with `Mock<Name>Service` implementations. These are placeholders so the template runs end-to-end without real SDKs — replace with real adapters per game by swapping the binding in the service's installer.
-
-**Exceptions (real impls already shipping):**
-- `UnityLocalizationService` (`Zero.Services.Localization`) wraps `com.unity.localization`. `LocalizationStep` short-circuits with a warning when no `LocalizationSettings` asset is configured, so the template still launches on a fresh clone. A `MockLocalizationService` is also available for headless tests.
-- `R3EventBus` (`Zero.Services.Events`) is the only impl of `IEventBus`; it is not "mock vs real" — it's the single production impl.
-- `UnityPoolService` (`Zero.Services.Pool`) wraps `UnityEngine.Pool.ObjectPool<GameObject>` (renamed from `ReflexPoolService` in Phase 1a; the old name is misleading — nothing in it uses Reflex's pool framework, it's just a Reflex-bound service).
-- `UnityInputService` (`Zero.Services.Input`, Phase 2) wraps `UnityEngine.InputSystem` + `EnhancedTouch`. Internal `InputDriver` MonoBehaviour polls per-frame; gesture detection (tap <200ms+<20px, swipe ≥50px in <500ms, drag, two-finger pinch) lives inside the service. `MockInputService` is kept for headless tests via the `ZERO_USE_MOCK_INPUT` define.
-- `AudioMixerService` (`Zero.Services.Audio`, Phase 2) loads an `AudioMixer` via `IAssetService` at Addressables key `audio/main_mixer`. The template ships **no mixer asset** — service falls back to per-source volume on a fresh clone (`InitializeAsync` pre-checks the key with `IAssetService.HasKeyAsync<T>` to avoid Addressables logging a red error). Buses Master/Music/Sfx/Ui/Voice persisted via `ISaveService` keys `audio.bus.{bus}`. Music crossfade via LitMotion `BindToVolume`; SFX via `IPoolService.GetPool<GameObject>` template. `MockAudioService` kept under `ZERO_USE_MOCK_AUDIO`.
-- `UnityMobileNotificationService` (`Zero.Services.Notification`, Phase 2) wraps `Unity.Notifications.NotificationCenter` (Unified API). All `using` + API calls are gated behind `#if UNITY_ANDROID || UNITY_IOS || UNITY_EDITOR` because the package's asmdef has `includePlatforms: [Android, Editor, iOS]`. `Initialize` is wrapped in try/catch (Editor on macOS goes to the iOS-fallback P/Invoke path which can throw). Permission is **NOT** requested at bootstrap — `NotificationStep` only initializes; consumers call `RequestPermissionAsync` at a "value moment". Permission outcome cached via `ISaveService` key `notification.permission.requested`. `MockNotificationService` kept under `ZERO_USE_MOCK_NOTIFICATION`.
-- `UIService` (`Zero.UI`, Phase 3) is the only impl of `IUIService`. Manages popup stack (generic `PushAsync<TPopup, TData, TResult>`), fullscreen screens, and toast queue. **Layer canvases are NOT spawned by the framework** — consumer attaches a `UIRoot` MonoBehaviour to their scene (Loading/Home/Play) with four Transform inspector slots (Hud/Popup/Overlay/System). `UIRoot.OnEnable` calls `IUIService.AttachRoot(layers)`; `OnDisable` calls `DetachRoot()`. `UIService.Push/Show/Toast` throw `InvalidOperationException` (or warn-and-drop for toast) if no root is attached. There is no `UIStep` in `ProjectScopeInstaller`. No UI prefabs ship with the template; consumers provide popup/screen/toast prefabs via Addressables key conventions (`ui/popup/<name>`, `ui/screen/<name>`, `ui/toast/default`). Full scene-setup recipe in `docs/ui/ui-root.md`.
-- `GameStateMachine` (`Zero.Gameplay`, Phase 4) is the only impl of `IGameStateMachine`. Flat states (`IGameState.EnterAsync/ExitAsync/Tick`); transitions are sequential ExitAsync→EnterAsync, then `OnStateChanged` (R3 Observable) fires once. **Concurrent `ChangeStateAsync` is rejected** with `InvalidOperationException` — consumer awaits the previous call before starting another (no implicit queue, see `docs/gameplay/state-machine.md` Design Rationale). Same-instance re-entry also rejected (create a fresh state). State machine is NOT a MonoBehaviour; consumer drives `Tick(deltaTime)` from their own update loop. `LevelLoader` is a thin Reflex-bound helper around `IAssetService` that returns `(GameObject Instance, IAssetHandle<GameObject> Handle)` — caller owns disposal. Sample states (`BootState`/`MenuState`/`PlayState`/`PauseState`/`ResultState`) ship as reference-only shells; consumer replaces. **No bootstrap step** — state machine has no async init.
-- `VersionCheckService` (`Zero.Services.VersionCheck`, Phase 5a) is the only impl of `IVersionCheckService`. Compares `Application.version` (3-part semver) vs remote-config keys `min_version`, `recommended_version`, `maintenance_mode`. Status precedence: `Maintenance` > `ForceUpdate` (local<min) > `SoftUpdate` (local<recommended) > `Ok`. Malformed/missing keys → warn + `Ok` (template degrades gracefully on flaky remote). Bound via `RegisterFactory` because the ctor takes a `string localVersion` Reflex can't auto-resolve; tests inject "1.0.0" because default template `ProductVersion` is "0.1" (2-part) → fails parse. `VersionCheckStep` is non-critical and runs after `RemoteConfigStep`; **the step does not show UI** — consumer reads `IVersionCheckService.LastResult` in their first scene and decides on a maintenance/force-update popup.
-- `Zero.DevTools` (Phase 5a) ships `CheatConsole` (tilde / 4-finger touch toggle), `FpsOverlay` (F2 toggle), command registry, and 4 built-in commands. Asmdef gated by `defineConstraints: ["UNITY_EDITOR || DEVELOPMENT_BUILD"]` so it strips from production builds. Spawn via `[RuntimeInitializeOnLoadMethod(AfterSceneLoad)]` in `DevToolsBootstrap` (also ifdef-gated). Commands discovered via reflection scan of all loaded assemblies for `[ConsoleCommand]`-decorated `IConsoleCommand` impls; instantiated via `Container.Construct(Type)` (NOT `Resolve` — commands aren't registered as contracts) with `Activator.CreateInstance` fallback. `save reset` is a stub — `ISaveService` has `Delete(key)` but no wholesale reset by design; consumer extends per-game.
-
-## Things that are easy to miss
-
-- **Save encryption seeds are per-game secrets.** `EncryptedJsonSaveService` loads encryption seeds from `Resources/ZeroSecrets.asset` (which you must create by copying `ZeroSecrets.asset.example` and replacing the placeholder marker). Player builds throw if the asset is missing or unconfigured; Editor builds warn loudly but continue so iteration isn't blocked. The file format is `[HMAC-SHA256 32B][IV 16B][AES-CBC ciphertext]` wrapping a versioned JSON envelope `{ "version": 1, "data": {...} }`. Migrations live in `Migrate(JObject, from, to)`. See `docs/services/save.md` and `docs/security/save-encryption.md` for detail.
-- **Reflex root scopes list is empty** in `Assets/Resources/ReflexSettings.asset` — that's intentional. The root container is built via `OnRootContainerBuilding` from `ProjectScopeInstaller`, not from a scope ScriptableObject.
-- **Only `Bootstrap.unity` is in build settings.** Game scenes are loaded via the scene service (Addressables-backed).
-- **`*.csproj` and `unity_zero.slnx` are gitignored** — they're regenerated by Unity. Don't edit them by hand.
-- **Each asmdef has `autoReferenced: false`.** Adding a reference between assemblies requires editing both the consumer's `.asmdef` and (if you introduce a new service) `Zero.Bootstrap.asmdef`. This also bites when wrapping Unity packages whose public API surfaces transitive types — e.g. `Zero.Services.Localization` must list `Unity.ResourceManager` (because `LocalizationSettings.InitializationOperation` returns `AsyncOperationHandle<>`) and `UniTask.Addressables` (for the `.ToUniTask()` extension on that handle).
-- **NuGetForUnity defaults `Editor.enabled: 0` on plugin metas.** That excludes the DLL from Editor-only asmdefs (e.g. `Zero.Tests.EditMode`). The repo carries patched `.meta` files for R3 + its transitive deps (`Microsoft.Bcl.AsyncInterfaces`, `Microsoft.Bcl.TimeProvider`, `System.ComponentModel.Annotations`, `System.Threading.Channels`) with Editor enabled. Re-running NuGet "Restore" may revert them; if EditMode tests stop discovering R3 symbols, check those metas first.
-- **`UnityPoolService` is EditMode-safe.** `DontDestroyOnLoad` and `Object.Destroy` both throw outside play mode, so `EnsureRoot` skips `DontDestroyOnLoad` in editor scripts and `Dispose` / `actionOnDestroy` route through a `SafeDestroy` helper that picks `DestroyImmediate` in EditMode. `PrewarmAsync` skips its `UniTask.Yield` breathe in EditMode (default `PlayerLoopTiming.Update` does not tick there) and prewarms by holding N instances out simultaneously before releasing them — looping `Get→Release` only ever creates one. Keep these guards if extending the pool; EditMode tests rely on them.
-- **Gameplay/Meta/UI must not reference each other.** They are peers — Codex review will flag any direct ref. Cross-tier coupling goes through `IEventBus`. Verify with `grep "Zero.UI\|Zero.Meta" Assets/_Project/Scripts/Runtime/Gameplay/Zero.Gameplay.asmdef` (must return empty).
-- **CI is configured:** `.github/workflows/tests.yml` runs EditMode tests on push + PR. Requires `UNITY_LICENSE` secret set per game-ci docs.
-- **Documentation is co-located:** 8 module docs under `docs/` (architecture, services, security, testing) follow the fixed format: Overview / Public API / Extension Points / Examples / Known Limitations / Design Rationale. See `docs/testing/writing-tests.md` and `docs/testing/ci.md` for test patterns.
-- **Plan + journal are source of truth for in-flight work.** `docs/dev/PLAN.md` defines phases + decisions; `docs/dev/JOURNAL.md` is append-only history of what landed. After every phase, update the journal AND this CLAUDE.md before merging — see `feedback_phase_workflow.md` in user memory.
-- **Read `docs/dev/PITFALLS.md` before extending any of: pool service, bootstrap pipeline, save service, localization, audio, notification, input, asmdef references, or NuGet plugin metas.** Each entry there came out of a real bug that wasn't caught until tests or runtime exposed it. Keep it updated as new footguns surface.
-- **Async EditMode tests must use `[UnityTest] public IEnumerator Foo() => UniTask.ToCoroutine(async () => { ... })`.** NUnit's `[Test]` attribute does not await `UniTask` — the method returns and assertions evaluate before the async body runs, so the test reports failed regardless of logic. `BootstrapPipelineTests`/`SaveServiceTests` follow this pattern; mirror it for any new async test. Pure-synchronous tests (`InputGestureTests`) can keep `[Test]`.
-- **`IAssetService.HasKeyAsync<T>(key, ct)` is the safe pre-check for optional Addressables.** `Addressables.LoadAssetAsync` calls `Debug.LogError` itself before throwing `InvalidKeyException`, so try/catch around `LoadAsync` shows a red error in console even when the service handles it. `HasKeyAsync` wraps `LoadResourceLocationsAsync`, which never throws. Use it whenever the service should degrade gracefully on a missing key (e.g., `AudioMixerService` for the optional mixer asset).
-- **Layer canvases are consumer-owned** (Phase 3 round 4). The framework no longer spawns canvases at runtime — `LayerCanvas.cs` and `UIStep.cs` were removed. Consumer authors a `UIRoot` MonoBehaviour in their scene with 4 Transform slots (Hud/Popup/Overlay/System); `UIRoot.OnEnable` calls `IUIService.AttachRoot`. Until a `UIRoot` is attached, every `UIService.Push/Show/Toast` throws (or warn-and-drops). Full recipe in `docs/ui/ui-root.md`.
-- **`LoadingScreenView` is component-only; no prefab ships.** Consumer attaches it to a GameObject with Slider + TextMeshProUGUI in their own `Loading.unity` scene. It injects `IBootstrapProgressReporter` (not `BootstrapPipeline`) to avoid resolution race conditions.
-- **Popup/Toast/Screen prefabs use Addressables key conventions** (Phase 3). Popup prefabs are loaded from `ui/popup/<PopupType.Name.ToLowerInvariant()>` (e.g., `ConfirmPopup` → `ui/popup/confirmpopup`). Screen prefabs from `ui/screen/<ScreenType.Name.ToLowerInvariant()>`. Toast prefab from `ui/toast/default`. If a key is missing, the service logs a warn and degrades gracefully (uses `HasKeyAsync` pre-check to avoid Addressables red errors).
-- **PopupBase and LocalizedText require MonoBehaviour-derived context.** Both need to resolve `[Inject]` fields or `GetComponent<>` on the same GameObject. Use in scenes that are part of the Reflex scope hierarchy (loaded after bootstrap), not in standalone EditMode test scenes.
-- **Gameplay layer is genre-agnostic by design** (Phase 4). `Zero.Gameplay` ships only the state-machine + level-loading scaffolds + 5 lifecycle events on the bus. Genre-specific systems (grid, runner, idle, merge, match-3) are explicitly out of template scope per PLAN §4. Consumer adds their own gameplay systems in their game asmdef and references `Zero.Gameplay` + `Zero.Services.Events`. Never add genre-specific code into `Zero.Gameplay`.
-- **`Container.RootContainer` is the static accessor for Reflex's root scope** (Phase 5a). `ContainerScope.Root` does not exist — `ContainerScope` only exposes the `OnRootContainerBuilding` / `OnSceneContainerBuilding` events. To resolve services from a non-injected MonoBehaviour (e.g. one spawned by `RuntimeInitializeOnLoadMethod`), grab `Container.RootContainer`. To construct a class that isn't registered as a contract but whose ctor takes registered services, call `container.Construct(Type)` — NOT `Resolve(Type)`, which throws `UnknownContractException` for unregistered types.
-- **New Input System is the active handler** (Phase 2 onwards). Legacy `Input.touchCount`, `Input.GetTouch`, `Input.GetKey`, `Input.mousePosition` etc. throw at runtime when "Active Input Handling" is set to "Input System Package" only (this project's setting). Always use `Keyboard.current`, `Mouse.current`, `Touchscreen.current.touches`, or the higher-level `IInputService`/`EnhancedTouch`. The `CheatConsole` round-1 implementation hit this — see Phase 5a journal entry.
-- **Reflex ctors with non-contract parameters need `RegisterFactory`** (Phase 5a). If a service's most-parameters ctor takes anything Reflex can't resolve from the container (e.g. a `string`, `int`, `Func<>`, or any unbound type), `RegisterType` will throw `UnknownContractException` at first resolve. Use `builder.RegisterFactory<TContract>(c => new Impl(c.Resolve<X>(), literalValue), ...)` instead. `VersionCheckServiceInstaller` is the canonical example — supplies `Application.version` for the `localVersion` ctor parameter.
-- **Repo ships two Claude Code sub-agent sets — pick the right tier per task.** Maintainer agents live at `.claude/agents/` (this repo): `unity-lead` (opus, architecture/phase-close/breaking decisions), `unity-senior` (sonnet, end-to-end feature implementation), `unity-junior` (haiku, one-file scaffolding/lint/test-stub), plus three specialists — `asmdef-boundary-reviewer`, `service-scaffolder` (sinh đúng 5-step convention), `pitfalls-guard` (diff vs `docs/dev/PITFALLS.md`). Consumer-facing agents ship in the `ClaudeMemory` sample (`Packages/com.tnbao91.nobody.zero/Samples~/ClaudeMemory/.claude/agents/`) — `game-lead`/`game-senior`/`game-junior` + the same three specialists tuned for consumer scope (forbid edits inside `Packages/com.tnbao91.nobody.zero/**`, prefer `ProjectScopeInstaller.UserServices.cs` partial). Never invoke a tier above what the task needs; specialists should auto-trigger on diff review.
+- Cross-reference `Zero.Gameplay` ↔ `Zero.Meta` ↔ `Zero.UI`. Use `IEventBus`.
+- Add genre-specific systems into `Zero.Gameplay`.
+- Add a real third-party SDK to the template. Mocks only (exception: Unity-shipped packages, already wired).
+- Use legacy `Input.*` API (`Input.touchCount`, `Input.GetKey`, `Input.mousePosition`...). Active Input Handling is "Input System Package" — legacy calls throw at runtime.
+- `RegisterType` for a ctor that takes a primitive or any unbound type. Use `RegisterFactory`.
+- Call `Object.Destroy` or `Object.DontDestroyOnLoad` without an `Application.isPlaying` guard (or use `UnityPoolService.SafeDestroy`). EditMode tests will throw.
+- Use `dynamic` in Runtime code. IL2CPP/AOT does not support the DLR.
+- Subscribe to R3 streams via lambda without `using R3;` at the top of the file. The lambda will bind to the wrong overload (CS1660).
+- Use C# 10+ syntax (`record struct`, `init;`, `required`, file-scoped namespaces). Unity 6 = C# 9.
 
 ## Build & test
 
-This is a Unity project — there is no shell-level build script. Operate via the Editor:
+This is a Unity project — no shell-level build script. Verify changes inside the Editor:
 
-- **Open**: open the project in Unity 6.0.3.11f1 (matching `ProjectSettings/ProjectVersion.txt`).
-- **Play**: open `Assets/_Project/Scenes/Bootstrap.unity` and press Play. The bootstrap pipeline log lines (`[Bootstrap] Step N/M: ...`) appear in the Console.
-- **Tests**: `Window → General → Test Runner`. EditMode and PlayMode test asmdefs exist at `Assets/_Project/Scripts/Tests/{EditMode,PlayMode}/` but are currently empty. Both are gated on the `UNITY_INCLUDE_TESTS` define and reference NUnit + Unity's TestRunner.
-- **Headless test run** (when needed):
-  ```
-  Unity -batchmode -nographics -projectPath . -runTests -testPlatform editmode -testResults results.xml -quit
-  ```
+- **Open**: Unity 6.0.3.11f1 (see `ProjectSettings/ProjectVersion.txt`).
+- **Play**: `Assets/_Project/Scenes/Bootstrap.unity` → Play. `[Bootstrap] Step N/M: ...` lines appear in Console.
+- **Tests**: `Window → General → Test Runner` (EditMode + PlayMode).
+- **Headless** (Editor must be closed first):
+  `Unity -batchmode -nographics -projectPath . -runTests -testPlatform editmode -testResults results.xml -quit`
 
-When verifying changes, prefer letting the user run the Editor — Claude can't open Unity. State explicitly when a change needs Editor verification rather than claiming it works.
+Claude cannot open Unity. When a change requires Editor verification, say so explicitly rather than claiming it works.
+
+## References
+
+Read in this order at the start of a session:
+
+- `docs/dev/PLAN.md` — full architectural plan + phase scope.
+- `docs/dev/JOURNAL.md` (tail) — what shipped per phase + decisions.
+- `docs/dev/PITFALLS.md` — **required** before extending: pool, bootstrap pipeline, save, localization, audio, notification, input, asmdef refs, NuGet metas, UI raycasting, IL2CPP/AOT. Every entry came from a real bug.
+- `docs/dev/AGENT-WORKFLOW.md` — phase + subagent pattern, source-of-truth file order, agent tier ladder.
+
+Module detail:
+
+- `docs/architecture/{asmdef-graph,bootstrap-pipeline,event-bus}.md`
+- `docs/services/<name>.md` — one per service, format: Overview / Public API / Extension Points / Examples / Known Limitations / Design Rationale.
+- `docs/ui/*` — `ui-root.md`, `popup-stack.md`, `toast.md`, `loading-screen.md`, `localized-text.md`, `safe-area.md`.
+- `docs/gameplay/{state-machine,level-loading}.md`.
+- `docs/security/save-encryption.md`.
+- `docs/testing/{writing-tests,ci,manual-checklist}.md`.
+
+AI sub-agents (two parallel sets — pick the right tier; specialists auto-trigger on diff review):
+
+- Maintainer-side at `.claude/agents/`: `unity-lead` (architecture/breaking) → `unity-senior` (feature implementation) → `unity-junior` (one-file scaffolding/lint). Specialists: `service-scaffolder`, `asmdef-boundary-reviewer`, `pitfalls-guard`.
+- Consumer-side at `Packages/com.tnbao91.nobody.zero/Samples~/ClaudeMemory/.claude/agents/`: `game-lead`/`game-senior`/`game-junior` + the same three specialists tuned for consumer scope (no edits inside `Packages/com.tnbao91.nobody.zero/**`; consumer-side wiring goes in `ProjectScopeInstaller.UserServices.cs` partial).

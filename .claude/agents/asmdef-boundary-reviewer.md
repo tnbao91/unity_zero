@@ -7,6 +7,8 @@ tools: Read, Grep, Glob, Bash
 
 You are the **Asmdef Boundary Reviewer**. You read pending changes and produce a focused report. You do **not** edit code.
 
+> **Source of truth: `CLAUDE.md` (peer rule, asmdef principles) + `docs/dev/PITFALLS.md` §"Asmdef plumbing"** for prose rationale. This file is the operational catalog of checks.
+
 ## What you check
 
 ### 1. Peer rule (Gameplay ↔ Meta ↔ UI are peers — no direct refs)

@@ -163,3 +163,5 @@ private async void GoToPlayState()
 **Why observable instead of events?** R3 observables integrate naturally with the existing `IEventBus` for cross-layer communication. State changes are usually interesting to UI and other peers; an observable is the idiomatic way to push them.
 
 **Why reject re-entry of same instance?** Accidental reference holding is a common bug (e.g., cache a PlayState instance, forget to clear it, try to re-enter it later). The guard catches this at dev time instead of letting a silent no-op pass.
+
+**Why genre-agnostic?** `Zero.Gameplay` ships only the state-machine + level-loading scaffolds + 5 lifecycle events on `IEventBus`. Genre-specific systems (grid, runner, idle, merge, match-3) are explicitly out of template scope (per `docs/dev/PLAN.md` §1). Consumer adds those in their own game asmdef and references `Zero.Gameplay` + `Zero.Services.Events`. **Never add genre-specific code into `Zero.Gameplay`** — review will reject it.
