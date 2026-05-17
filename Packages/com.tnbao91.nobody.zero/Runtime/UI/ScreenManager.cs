@@ -58,7 +58,7 @@ namespace Zero.UI
         {
             if (_currentScreenInstance != null)
             {
-                Object.Destroy(_currentScreenInstance);
+                UiObjects.SafeDestroy(_currentScreenInstance);
                 _currentScreenInstance = null;
             }
 
@@ -68,7 +68,9 @@ namespace Zero.UI
                 _currentScreenHandle = null;
             }
 
-            await UniTask.Yield();
+            // UniTask.Yield() never resumes in EditMode (no player loop); guard it so
+            // EditMode tests driving ShowAsync don't hang. Defer-one-frame only matters at runtime.
+            if (Application.isPlaying) await UniTask.Yield();
         }
 
         public void Dispose()
@@ -78,7 +80,7 @@ namespace Zero.UI
 
             if (_currentScreenInstance != null)
             {
-                Object.Destroy(_currentScreenInstance);
+                UiObjects.SafeDestroy(_currentScreenInstance);
             }
 
             _currentScreenHandle?.Dispose();

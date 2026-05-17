@@ -33,7 +33,7 @@ namespace Zero.Core
 ## Extension Points
 
 - **Component pools:** call `GetPool<MyComponent>(prefab)` where `prefab` is a `GameObject` *or* the component itself; the inner `ComponentPool<T>` wraps the GameObject pool and resolves the component on each spawn.
-- **Custom defaults:** the `UnityEngine.Pool.ObjectPool<GameObject>` is created in `UnityPoolService.GameObjectPool` with `defaultCapacity: 10`, `maxSize: 10000`, and Editor-only `collectionCheck`. Per-game tuning means swapping the binding in `PoolServiceInstaller` for a subclass that overrides those constants.
+- **Custom defaults:** the `UnityEngine.Pool.ObjectPool<GameObject>` is created in `UnityPoolService.GameObjectPool` with `defaultCapacity: 10`, `maxSize: 10000`, and Editor-only `collectionCheck`. `UnityPoolService` is `sealed`; per-game tuning means swapping the binding in `PoolServiceInstaller` for a full `IPoolService` replacement implementation with the constants you want.
 - **Replace entirely:** rebind `IPoolService` to a different impl in your own `<Game>ScopeInstaller.UserServices.cs` partial — Reflex picks the last registration.
 
 ## Examples

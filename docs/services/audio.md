@@ -43,7 +43,7 @@ public enum AudioBus
 
 3. **Volume ramps:** `PlayMusicAsync` uses 0.3s crossfade via LitMotion. Adjust the duration (currently hardcoded) in the method.
 
-4. **Spatial audio:** AudioSource components created by the pool support 3D positioning. Extend `PlaySfxAsync` to accept position/spatialBlend parameters.
+4. **Spatial audio:** AudioSource components created by the pool support 3D positioning. `AudioMixerService` is `sealed`; add position/spatialBlend support by swapping the binding in `AudioServiceInstaller` for a custom `IAudioService` implementation (or a decorator wrapping `AudioMixerService`).
 
 5. **Platform support:** Audio Service requires the mixer asset on all platforms and no-ops gracefully on unsupported targets.
 

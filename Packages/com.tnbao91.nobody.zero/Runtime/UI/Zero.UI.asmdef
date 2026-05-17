@@ -7,7 +7,6 @@
         "Zero.Services.Events",
         "Zero.Services.Localization",
         "UniTask",
-        "R3",
         "Reflex",
         "LitMotion",
         "LitMotion.Extensions",

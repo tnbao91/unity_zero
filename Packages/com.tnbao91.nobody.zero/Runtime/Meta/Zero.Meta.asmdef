@@ -6,7 +6,6 @@
         "Zero.Infrastructure",
         "Zero.Services.Events",
         "UniTask",
-        "R3",
         "Reflex"
     ],
     "includePlatforms": [],

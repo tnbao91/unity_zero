@@ -103,13 +103,15 @@ namespace Zero.UI
                         Debug.Log($"[UI] Toast prefab not available. Message: {text}");
                     }
 
-                    // Wait for the duration
-                    await UniTask.Delay(TimeSpan.FromSeconds(durationSeconds));
+                    // Wait for the duration. UniTask.Delay never resumes in EditMode
+                    // (no player loop) — guard so the queue loop doesn't hang in tests.
+                    if (Application.isPlaying)
+                        await UniTask.Delay(TimeSpan.FromSeconds(durationSeconds));
 
                     // Destroy the toast instance
                     if (toastInstance != null)
                     {
-                        Object.Destroy(toastInstance);
+                        UiObjects.SafeDestroy(toastInstance);
                     }
                 }
                 finally

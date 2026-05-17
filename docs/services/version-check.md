@@ -64,7 +64,7 @@ builder.RegisterFactory<IVersionCheckService>(
 c => new VersionCheckService(c.Resolve<IRemoteConfigService>(), c.Resolve<ILogService>(), MyBuildManifest.SemanticVersion);
 ```
 
-**Add new status fields** (e.g. `ReleaseNotesUrl`, `ChangelogText`) by extending `VersionCheckResult` and the service. Keep `IVersionCheckService` minimal; advertise extra metadata via `IRemoteConfigService.TryGetString` reads in your routing code instead of fattening the interface.
+**Add new status fields** (e.g. `ReleaseNotesUrl`, `ChangelogText`): `VersionCheckResult` is a `readonly struct` (cannot be derived from) — replace it with a new struct that includes the extra fields and update the `IVersionCheckService.CheckAsync` return type accordingly. Keep `IVersionCheckService` minimal; advertise extra metadata via `IRemoteConfigService.TryGetString` reads in your routing code instead of fattening the interface.
 
 ## Examples
 

@@ -6,7 +6,6 @@
         "Zero.Infrastructure",
         "UniTask",
         "UniTask.Addressables",
-        "R3",
         "Reflex",
         "Unity.Addressables",
         "Unity.ResourceManager"
