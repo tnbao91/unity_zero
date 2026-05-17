@@ -19,9 +19,6 @@ This repository serves two audiences:
 
 ## Install via Package Manager
 
-> ⚠️ **Minimum installable version: `0.2.1`.** Tags `v0.1.0` and `v0.2.0` ship with a missing `Runtime/Services/Log/` folder (a global `.gitignore` collision on the dev machine silently dropped 6 files during the v0.1.0 restructure; v0.2.1 hotfix restored them and added a negation rule). They will not compile. Always pin `0.2.1` or later.
-
-
 ### 1. Add scoped registries
 
 In your project's `Packages/manifest.json`:
@@ -55,6 +52,8 @@ openupm add com.tnbao91.nobody.zero
 ```
 
 Or `Add package by name` → `com.tnbao91.nobody.zero`.
+
+> Pin `0.2.1` or later. Tags `v0.1.0` / `v0.2.0` are broken (missing `Runtime/Services/Log/` from a `.gitignore` collision); see the [CHANGELOG](CHANGELOG.md) `0.2.1` entry.
 
 ### 4. Import Bootstrap sample
 
@@ -122,7 +121,7 @@ Gameplay/Meta/UI never reference each other directly — cross-tier coupling goe
 3. **NuGet**: `NuGet → Restore Packages` (NuGetForUnity menu) for R3 BCL transitive deps. Patched plugin metas in this repo enable `Editor.enabled` for R3 + transitive deps; do not let NuGet revert those.
 4. **Encryption seed**: copy `Assets/Resources/ZeroSecrets.asset.example` to `ZeroSecrets.asset`, replace placeholders. Gitignored.
 5. **Open** `Assets/_Project/Scenes/Bootstrap.unity` → Press Play. Pipeline runs all 16 bootstrap steps.
-6. **Tests**: `Window → General → Test Runner`. ~78 EditMode cases should be green.
+6. **Tests**: `Window → General → Test Runner`. ~79 EditMode cases should be green.
 7. **Read `CLAUDE.md`** before extending — it's the project constitution (principles + anti-patterns + references). Module detail lives in `docs/`; footguns in [`docs/dev/PITFALLS.md`](docs/dev/PITFALLS.md).
 
 ### Pre-commit hooks
@@ -156,20 +155,6 @@ unity_zero/
 ```
 
 When editing the package: the dev `Assets/_Project/Scenes/Bootstrap.unity` is the canonical scene. Before tagging a release, copy changes to `Packages/com.tnbao91.nobody.zero/Samples~/BootstrapScene/Bootstrap.unity`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the sync convention.
-
-### Phase status
-
-All five build phases are complete and merged to `main`. See [docs/dev/JOURNAL.md](docs/dev/JOURNAL.md) for per-phase deltas + lessons learned.
-
-| Phase | Scope | Status |
-|---|---|---|
-| 1a / 1b | Foundation: asmdef restructure, event bus, localization wrap, save hardening, pool refactor, tests + CI | Done |
-| 2 | Real Input + Audio + Notification (wrap Unity packages) | Done |
-| 3 | UI scaffolding: popup stack, screens, transitions, toast, localized text, consumer-owned `UIRoot` | Done |
-| 4 | Gameplay scaffolding: state machine, level loader, lifecycle events, sample states | Done |
-| 5a | Live-Ops: VersionCheck service. DevTools: cheat console + FPS overlay (gated to Editor / DEVELOPMENT_BUILD) | Done |
-| 5b | Cross-cutting docs: README, LICENSE, CONTRIBUTING, 8 Mock SDK extension recipes, meta recipes | Done |
-| UPM | Restructure to UPM package layout for `git+https://...?path=Packages/...` install + OpenUPM publish | v0.1.0 |
 
 ## Documentation
 
