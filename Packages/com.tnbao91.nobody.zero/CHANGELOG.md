@@ -2,6 +2,24 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; per-phase implementation deltas live in [`docs/dev/JOURNAL.md`](https://github.com/tnbao91/unity_zero/blob/main/docs/dev/JOURNAL.md) at the repo.
 
+## [0.2.3] — 2026-05-17
+
+Post-review cleanup — no behavior change to shipped services. Safe drop-in upgrade.
+
+### Removed
+- Example Gameplay state shells (`BootState` / `MenuState` / `PlayState` / `PauseState` / `ResultState`). Gameplay states are consumer-authored; `GameStateMachine` + `LevelLoader` scaffold and lifecycle events are unaffected. Consumer-visible API removal → patch bump.
+
+### Fixed
+- `Zero.UI` (`UIService`, `ScreenManager`, `ToastQueue`) + `AudioMixerService`: EditMode-safe destroy via new `Zero.UI.UiObjects.SafeDestroy`; PlayerLoop-await guards (`Application.isPlaying`).
+- `AudioMixerService` music/SFX paths: `HasKeyAsync` pre-check before `LoadAsync<AudioClip>`.
+
+### Changed
+- Service docs corrected to the binding-swap / decorator model on `sealed` impls (no "subclass / override").
+- Removed inert `"R3"` entry from `references[]` in 18 runtime asmdefs (R3 is a NuGetForUnity DLL, auto-included).
+
+### Notes
+- Full detail in [`docs/dev/JOURNAL.md`](https://github.com/tnbao91/unity_zero/blob/main/docs/dev/JOURNAL.md).
+
 ## [0.2.2] — 2026-05-12
 
 Documentation restructure — no runtime / API changes. Safe drop-in upgrade.
