@@ -2,6 +2,21 @@
 
 All notable template-level changes are recorded here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; per-phase deltas with file-level detail and bug retros live in [`docs/dev/JOURNAL.md`](docs/dev/JOURNAL.md).
 
+## [0.2.3] — 2026-05-17 — Post-review cleanup
+
+Post-review pass (asmdef + pitfalls + architecture). No behavior change to shipped services; scope tightening + EditMode-safety hardening.
+
+### Removed
+- Example state shells (`BootState`, `MenuState`, `PlayState`, `PauseState`, `ResultState`) from `Zero.Gameplay`. Gameplay states are consumer-authored — sample shells in shipped `Runtime/` blurred the genre-agnostic boundary. The `GameStateMachine` + `LevelLoader` scaffold and lifecycle events are unaffected. Consumer-visible API removal → patch bump.
+
+### Fixed
+- `Zero.UI` (`UIService`, `ScreenManager`, `ToastQueue`) and `AudioMixerService` no longer call `Object.Destroy` / `await UniTask.Yield()` from a path reachable in EditMode without an `Application.isPlaying` guard. Added `Zero.UI.UiObjects.SafeDestroy` (mirrors `UnityPoolService.SafeDestroy`).
+- `AudioMixerService.PlayMusicAsync` / `PlaySfxAsync` now `HasKeyAsync` pre-check before `LoadAsync<AudioClip>` — a missing clip key no longer logs a red `InvalidKeyException` outside the try/catch.
+
+### Changed
+- Service docs (`localization`, `pool`, `audio`, `version-check`) no longer say "subclass / override / extend" on `sealed` impls or `readonly struct`s — corrected to the binding-swap / decorator extension model per the sealed-services principle in `CLAUDE.md`.
+- Removed inert `"R3"` entry from `references[]` in 18 runtime asmdefs (R3 ships as a NuGetForUnity DLL with `overrideReferences:false`; the asmdef entry was silently ignored).
+
 ## [0.2.2] — 2026-05-12 — Docs: CLAUDE.md as constitution
 
 Repo-wide documentation pass. Re-anchors `CLAUDE.md` as a constitution (principles + anti-patterns + references) rather than an index. No runtime / package API changes — safe drop-in.
