@@ -123,6 +123,15 @@ namespace Zero.Services.Audio
                 return;
             }
 
+            // Pre-check: skip LoadAsync if key isn't registered, otherwise Addressables logs a red
+            // InvalidKeyException to the console before the try/catch can convert it. Same pattern
+            // as InitializeAsync. Done before the fade-out so a bad key doesn't kill current music.
+            if (!await _assetService.HasKeyAsync<AudioClip>(clipKey, ct))
+            {
+                _log.Warn($"[AUDIO] No music Addressable for key '{clipKey}'. Keeping current music.");
+                return;
+            }
+
             // Fade out current music (0.3s)
             if (_musicSource.isPlaying)
             {
@@ -165,6 +174,13 @@ namespace Zero.Services.Audio
 
         public async UniTask PlaySfxAsync(string clipKey, CancellationToken ct = default)
         {
+            // Pre-check: skip LoadAsync if key isn't registered (see PlayMusicAsync rationale).
+            if (!await _assetService.HasKeyAsync<AudioClip>(clipKey, ct))
+            {
+                _log.Warn($"[AUDIO] No SFX Addressable for key '{clipKey}'. Skipping.");
+                return;
+            }
+
             IAssetHandle<AudioClip> handle = null;
             GameObject go = null;
             try

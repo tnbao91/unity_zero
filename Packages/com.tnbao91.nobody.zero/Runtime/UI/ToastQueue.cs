@@ -109,7 +109,7 @@ namespace Zero.UI
                     // Destroy the toast instance
                     if (toastInstance != null)
                     {
-                        Object.Destroy(toastInstance);
+                        UiObjects.SafeDestroy(toastInstance);
                     }
                 }
                 finally

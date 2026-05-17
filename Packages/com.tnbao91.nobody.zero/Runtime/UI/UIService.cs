@@ -168,7 +168,7 @@ namespace Zero.UI
                 if (popupComponent == null)
                 {
                     Debug.LogError($"[UI] Popup '{popupKey}' does not have PopupBase<{typeof(TData).Name}, {typeof(TResult).Name}> component", popupInstance);
-                    Object.Destroy(popupInstance);
+                    UiObjects.SafeDestroy(popupInstance);
                     throw new InvalidOperationException($"Popup {popupKey} missing PopupBase component");
                 }
 
@@ -194,8 +194,8 @@ namespace Zero.UI
                 }
                 catch (OperationCanceledException)
                 {
-                    Object.Destroy(popupInstance);
-                    if (backdrop != null) Object.Destroy(backdrop);
+                    UiObjects.SafeDestroy(popupInstance);
+                    if (backdrop != null) UiObjects.SafeDestroy(backdrop);
                     if (_activePopups.Count > 0) _activePopups.Pop();
                     _popupStacks[Core.UiLayer.Popup].TryPop(out _);
                     throw;
@@ -219,8 +219,8 @@ namespace Zero.UI
 
                 // Close the popup
                 await popupComponent.OnCloseAsync(result, ct);
-                Object.Destroy(popupInstance);
-                if (backdrop != null) Object.Destroy(backdrop);
+                UiObjects.SafeDestroy(popupInstance);
+                if (backdrop != null) UiObjects.SafeDestroy(backdrop);
 
                 // Pop from stack
                 _popupStacks[Core.UiLayer.Popup].TryPop(out _);
@@ -262,8 +262,8 @@ namespace Zero.UI
                 handle.Cancel();
 
                 // Destroy the popup and its backdrop
-                Object.Destroy(popupInstance);
-                if (backdrop != null) Object.Destroy(backdrop);
+                UiObjects.SafeDestroy(popupInstance);
+                if (backdrop != null) UiObjects.SafeDestroy(backdrop);
 
                 // Pop from stack
                 _popupStacks[Core.UiLayer.Popup].TryPop(out _);

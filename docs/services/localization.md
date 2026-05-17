@@ -26,7 +26,7 @@ public sealed class MockLocalizationService : IL10nService { ... }
 
 ## Extension Points
 
-**Custom locale provider:** if you need to load locale list from a remote config or database (instead of Unity's built-in list), subclass `UnityLocalizationService` and override `SetLocaleAsync`.
+**Custom locale provider:** if you need to load the locale list from a remote config or database (instead of Unity's built-in list), `UnityLocalizationService` is `sealed` — swap the binding in `LocalizationServiceInstaller.Install(...)` for your own `IL10nService` implementation (or a decorator that wraps the default and overrides locale resolution).
 
 **Key namespacing:** keys follow a `scope.category.string` pattern to avoid collisions:
 - `ui.popup.win.title`
