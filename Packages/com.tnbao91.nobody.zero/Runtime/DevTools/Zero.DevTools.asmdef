@@ -6,7 +6,6 @@
         "Unity.InputSystem",
         "UniTask",
         "Reflex"
-
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

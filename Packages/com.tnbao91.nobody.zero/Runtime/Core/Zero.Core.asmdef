@@ -3,7 +3,6 @@
     "rootNamespace": "Zero.Core",
     "references": [
         "UniTask"
-
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
