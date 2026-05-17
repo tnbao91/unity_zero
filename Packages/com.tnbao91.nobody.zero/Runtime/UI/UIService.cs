@@ -271,7 +271,9 @@ namespace Zero.UI
                 // Publish close event
                 _eventBus.Publish(new PopupClosed(popupKey));
 
-                await UniTask.Yield(cancellationToken: ct);
+                // UniTask.Yield never resumes in EditMode (no player loop); guard so an
+                // EditMode test driving PopAsync doesn't hang. Same sweep as ScreenManager.
+                if (Application.isPlaying) await UniTask.Yield(cancellationToken: ct);
             }
         }
 
