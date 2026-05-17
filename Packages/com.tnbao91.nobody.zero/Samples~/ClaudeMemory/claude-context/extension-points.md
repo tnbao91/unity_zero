@@ -46,7 +46,7 @@ Recipes per SDK at upstream `docs/services/<sdk>.md`:
 
 ## 2. Add a game state
 
-Game state machine (`IGameStateMachine`) ships with sample states (BootState, MenuState, PlayState, PauseState, ResultState) — replace them.
+Game state machine (`IGameStateMachine`) needs consumer-authored game states — the template ships none. Implement `IGameState` per genre.
 
 ```csharp
 // Assets/_Game/States/MyMatch3PlayState.cs

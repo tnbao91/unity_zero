@@ -54,7 +54,7 @@ Every interface lives in `Zero.Core` namespace. Implementations bound at root sc
 | Interface | Notes |
 |---|---|
 | `IGameStateMachine` | `CurrentState`, `Observable<IGameState> OnStateChanged`, `ChangeStateAsync(IGameState, ct)`. Flat states. **Concurrent calls throw** — await previous before next. **Same-instance re-entry throws** — create fresh state instance. Consumer drives `Tick(deltaTime)` from update loop. |
-| `IGameState` | `EnterAsync(ct)`, `ExitAsync(ct)`, `Tick(deltaTime)`. Sample shells: `BootState`, `MenuState`, `PlayState`, `PauseState`, `ResultState` — replace per game. |
+| `IGameState` | `EnterAsync(ct)`, `ExitAsync(ct)`, `Tick(deltaTime)`. The template ships no example states — you author `IGameState` impls per genre; pattern in upstream `docs/gameplay/state-machine.md`. |
 | `LevelLoader` | Self-bound helper. `LoadLevelAsync(addressableKey, ct)` returns `(GameObject Instance, IAssetHandle<GameObject> Handle)`. Caller owns disposal. |
 | `ILevelDefinition` | Abstract `ScriptableObject` (`Id`, `DisplayName`, `AddressablePrefabKey`). Subclass per genre. |
 

@@ -18,7 +18,7 @@ Object.DontDestroyOnLoad(go);
 if (Application.isPlaying) Object.DontDestroyOnLoad(go);
 ```
 
-See `Assets/_Project/Scripts/Runtime/Services/Pool/UnityPoolService.cs` `EnsureRoot()`.
+See `Packages/com.tnbao91.nobody.zero/Runtime/Services/Pool/UnityPoolService.cs` `EnsureRoot()`.
 
 ### `Object.Destroy` is play-mode-only
 
@@ -260,7 +260,7 @@ If you write a wrapper with a plausible-looking ctor like `public Foo(ILogServic
 
 `IAssetService.LoadAsync<T>` returns `UniTask<IAssetHandle<T>>`, not `UniTask<T>`. The handle exposes `T Asset { get; }` plus `IDisposable`. Code that writes `T x = await _assetService.LoadAsync<T>(key, ct);` looks idiomatic and will compile against a wrong assumption — except it won't, because the type doesn't match. The same trap exists for `IPoolService.GetPool<T>(T prefab)`: pass a `GameObject` template and you get `IPool<GameObject>`, not `IPool<AudioSource>`. AudioSource has to be fetched via `GetComponent` after `Spawn()`. Confusing the return type was Phase 2's most-repeated bug.
 
-The remedy is the same as the documentation-discipline rule above: open the interface file in `Assets/_Project/Scripts/Runtime/Core/Interfaces/` and read the actual signature. AI assistants generating Service-shaped wrappers from familiarity with similar APIs (Addressables.LoadAssetAsync<T> returning T, Unity Pool returning the prefab type) will reach for the wrong shape almost every time.
+The remedy is the same as the documentation-discipline rule above: open the interface file in `Packages/com.tnbao91.nobody.zero/Runtime/Core/Interfaces/` and read the actual signature. AI assistants generating Service-shaped wrappers from familiarity with similar APIs (Addressables.LoadAssetAsync<T> returning T, Unity Pool returning the prefab type) will reach for the wrong shape almost every time.
 
 ### Addressables logs the red exception BEFORE your try/catch sees it
 
@@ -307,7 +307,7 @@ If you need dispatch based on a type you can't express in a generic signature, u
 2. Explicit cast `(IPopupHandle)handle` at the push site.
 3. Call the interface method directly on the stack variable.
 
-See `Assets/_Project/Scripts/Runtime/UI/PopupHandle.cs` and `UIService.PopAsync()`.
+See `Packages/com.tnbao91.nobody.zero/Runtime/UI/PopupHandle.cs` and `UIService.PopAsync()`.
 
 ### Override-sorting child Canvas needs its own GraphicRaycaster
 
@@ -328,7 +328,7 @@ backdropGo.AddComponent<Image>().raycastTarget = true;
 
 The symptom is that `IPointerClickHandler.OnPointerClick()` never fires on the backdrop despite `raycastTarget = true` and a click landing inside its Image bounds. Add the `GraphicRaycaster` to restore the raycasting chain.
 
-See `Assets/_Project/Scripts/Runtime/UI/UIService.CreateBackdrop()`.
+See `Packages/com.tnbao91.nobody.zero/Runtime/UI/UIService.CreateBackdrop()`.
 
 ---
 

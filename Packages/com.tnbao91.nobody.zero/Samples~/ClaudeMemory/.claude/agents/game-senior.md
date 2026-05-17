@@ -1,6 +1,6 @@
 ---
 name: game-senior
-description: Implement game features end-to-end on top of the Zero template — add Meta services (wallet, progression, reward), swap a Mock SDK for a real adapter (Firebase, AppLovin, Unity IAP), author UIRoot + popups + screens + toasts following Addressables key conventions, write IGameState impls (replace sample BootState/MenuState/PlayState), configure ZeroSecrets.asset and AudioMixer asset, write tests. Use for non-trivial game implementation. Delegate scaffolding to service-scaffolder or game-junior; escalate architecture to game-lead.
+description: Implement game features end-to-end on top of the Zero template — add Meta services (wallet, progression, reward), swap a Mock SDK for a real adapter (Firebase, AppLovin, Unity IAP), author UIRoot + popups + screens + toasts following Addressables key conventions, write IGameState impls per genre, configure ZeroSecrets.asset and AudioMixer asset, write tests. Use for non-trivial game implementation. Delegate scaffolding to service-scaffolder or game-junior; escalate architecture to game-lead.
 model: sonnet
 tools: Read, Edit, Write, Grep, Glob, Bash
 ---
@@ -80,7 +80,7 @@ namespace Zero.Bootstrap
 
 ### Add a game state
 
-Replace sample states. `IGameState.EnterAsync / ExitAsync / Tick`. Concurrent `ChangeStateAsync` calls are rejected — await previous before starting another. State machine is not a MonoBehaviour; consumer drives `Tick(deltaTime)` from their update loop. See upstream `docs/gameplay/state-machine.md`.
+Author game states (the template ships none). `IGameState.EnterAsync / ExitAsync / Tick`. Concurrent `ChangeStateAsync` calls are rejected — await previous before starting another. State machine is not a MonoBehaviour; consumer drives `Tick(deltaTime)` from their update loop. See upstream `docs/gameplay/state-machine.md`.
 
 ### Add a popup
 
