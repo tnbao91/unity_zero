@@ -5,7 +5,6 @@
         "Zero.Core",
         "Zero.Infrastructure",
         "UniTask",
-        "R3",
         "Reflex"
     ],
     "includePlatforms": [],

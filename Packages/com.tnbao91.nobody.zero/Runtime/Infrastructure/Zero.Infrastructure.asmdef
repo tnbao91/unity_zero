@@ -4,7 +4,6 @@
     "references": [
         "Zero.Core",
         "UniTask",
-        "R3",
         "Reflex"
     ],
     "includePlatforms": [],

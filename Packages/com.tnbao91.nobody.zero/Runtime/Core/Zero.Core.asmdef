@@ -2,8 +2,8 @@
     "name": "Zero.Core",
     "rootNamespace": "Zero.Core",
     "references": [
-        "UniTask",
-        "R3"
+        "UniTask"
+
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
