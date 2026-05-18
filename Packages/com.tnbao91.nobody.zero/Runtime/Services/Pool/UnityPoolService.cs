@@ -5,6 +5,7 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Pool;
 using Zero.Core;
+using Zero.Infrastructure;
 using Object = UnityEngine.Object;
 
 namespace Zero.Services.Pool
@@ -83,16 +84,7 @@ namespace Zero.Services.Pool
             _disposed = true;
             foreach (var p in _pools.Values) p.Dispose();
             _pools.Clear();
-            if (_root != null) SafeDestroy(_root.gameObject);
-        }
-
-        // Object.Destroy is play-mode only; EditMode tests + editor scripts must
-        // use DestroyImmediate. Centralised so the runtime path stays the same.
-        private static void SafeDestroy(GameObject go)
-        {
-            if (go == null) return;
-            if (Application.isPlaying) Object.Destroy(go);
-            else Object.DestroyImmediate(go);
+            if (_root != null) Util.SafeDestroy(_root.gameObject);
         }
 
         private GameObjectPool ResolveGameObjectPool<T>(T prefab) where T : Object
@@ -175,7 +167,7 @@ namespace Zero.Services.Pool
 
             private void OnDestroy(GameObject go)
             {
-                SafeDestroy(go);
+                Util.SafeDestroy(go);
             }
 
             public GameObject Spawn() => Spawn(Vector3.zero, Quaternion.identity);

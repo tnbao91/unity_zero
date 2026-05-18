@@ -2,6 +2,11 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; per-phase implementation deltas live in [`docs/dev/JOURNAL.md`](https://github.com/tnbao91/unity_zero/blob/main/docs/dev/JOURNAL.md) at the repo.
 
+## [Unreleased]
+
+### Changed
+- Internal refactor, no behavior change, safe drop-in: de-duplicated the EditMode-safe destroy guard into `Zero.Infrastructure.Util.SafeDestroy(GameObject)`. Replaces the byte-identical `Zero.UI.UiObjects.SafeDestroy` (`internal`, now removed) and `UnityPoolService.SafeDestroy` (`private`). No behavior change. Net consumer API delta: one new `public` helper `Zero.Infrastructure.Util.SafeDestroy(GameObject)` (nothing removed from the consumer surface).
+
 ## [0.2.3] — 2026-05-17
 
 Post-review cleanup — no behavior change to shipped services. Safe drop-in upgrade.

@@ -5,6 +5,7 @@ using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using Zero.Core;
+using Zero.Infrastructure;
 using Object = UnityEngine.Object;
 
 namespace Zero.UI
@@ -111,7 +112,7 @@ namespace Zero.UI
                     // Destroy the toast instance
                     if (toastInstance != null)
                     {
-                        UiObjects.SafeDestroy(toastInstance);
+                        Util.SafeDestroy(toastInstance);
                     }
                 }
                 finally

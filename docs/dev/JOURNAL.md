@@ -305,3 +305,14 @@ Triggered by a full-project review (three agents: asmdef-boundary-reviewer, pitf
 - **C — chore.** Removed inert `"R3"` from `references[]` in 18 runtime asmdefs. R3 is a NuGetForUnity DLL; with `overrideReferences:false` it's auto-included, so the asmdef entry was silently ignored and only misled reviewers into thinking asmdef-level protection existed. WARN-2 (Notification→ISaveService) intentionally NOT changed — `ISaveService` lives in `Zero.Core` which is already referenced; the dep is interface-only via DI.
 - Verification: static greps green (no `Object.Destroy(` outside `UiObjects.cs` in `Runtime/UI/`, no `"R3"` in runtime asmdefs, no old state-shell refs). **Editor verification (Play + Test Runner EditMode/PlayMode) pending — Claude cannot open Unity; user to confirm.**
 - Resume hint: after user confirms Editor green, this branch is mergeable. No follow-up phase.
+
+---
+
+## SafeDestroy de-dup — 2026-05-18 — internal refactor
+
+Follow-up on the round-B decision above. `Zero.UI.UiObjects.SafeDestroy` (internal) and `UnityPoolService.SafeDestroy` (private) were byte-identical guards. The round-B rationale ("duplicated, not a cross-asmdef ref into `Zero.Services.Pool`") only weighed `Zero.Core`/`Zero.Services.Pool` and **missed that both `Zero.UI` and `Zero.Services.Pool` already reference `Zero.Infrastructure`** — a legal shared home that violates no peer rule and doesn't dilute `Zero.Core`'s interfaces-+-POCOs constraint. So the duplication decision was stale, not wrong-on-principle.
+
+- New `public static Zero.Infrastructure.Util.SafeDestroy(GameObject)` (file `Runtime/Infrastructure/Util.cs`, intentionally named `Util` as the catch-all home for future cross-cutting non-GameObject helpers). `UiObjects.cs`+`.meta` deleted via `git rm`; `UnityPoolService` private copy + comment removed.
+- Call sites repointed: `ToastQueue` (×1), `ScreenManager` (×2), `UIService` (×6), `UnityPoolService` (×2 — `Dispose`, nested `GameObjectPool.OnDestroy`). Added `using Zero.Infrastructure;` to the 4 files. `ScreenManagerEditModeDestroyTests` doc comment updated (`UiObjects` → `Util`).
+- No behavior change. The two old symbols were not consumer-visible (`internal`/`private`); the replacement `Util` is deliberately `public` (general cross-cutting home per the requested intent), so the net consumer API delta is *one added* `public` helper, nothing removed. Grep green: zero `UiObjects` refs remain in `Packages/`+`Assets/`. CHANGELOG (root + package) under `[Unreleased]`. **Not** version-bumped — additive-only, no removal/break; defer the patch bump + tag to the next release batch.
+- Verification: static greps only. **Editor (Play `Bootstrap.unity` + Test Runner EditMode/PlayMode, esp. `ScreenManagerEditModeDestroyTests`) pending — Claude cannot open Unity; user to confirm.**

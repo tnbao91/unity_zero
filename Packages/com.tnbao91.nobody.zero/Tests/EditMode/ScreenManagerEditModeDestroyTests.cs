@@ -15,7 +15,7 @@ namespace Zero.Tests.EditMode
     /// <summary>
     /// Regression guard for the EditMode-unsafe <c>Object.Destroy</c> pitfall.
     /// <c>ScreenManager.ShowAsync</c> calls <c>UnloadScreenAsync</c> on the second show,
-    /// which destroys the previous screen instance. Before the <c>UiObjects.SafeDestroy</c>
+    /// which destroys the previous screen instance. Before the <c>Util.SafeDestroy</c>
     /// fix that path called <c>Object.Destroy</c> directly and threw
     /// "Destroy may not be called from edit mode" here. This test fails iff that returns.
     /// </summary>

@@ -3,6 +3,7 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using Zero.Core;
+using Zero.Infrastructure;
 using Object = UnityEngine.Object;
 
 namespace Zero.UI
@@ -58,7 +59,7 @@ namespace Zero.UI
         {
             if (_currentScreenInstance != null)
             {
-                UiObjects.SafeDestroy(_currentScreenInstance);
+                Util.SafeDestroy(_currentScreenInstance);
                 _currentScreenInstance = null;
             }
 
@@ -80,7 +81,7 @@ namespace Zero.UI
 
             if (_currentScreenInstance != null)
             {
-                UiObjects.SafeDestroy(_currentScreenInstance);
+                Util.SafeDestroy(_currentScreenInstance);
             }
 
             _currentScreenHandle?.Dispose();

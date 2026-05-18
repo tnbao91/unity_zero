@@ -2,6 +2,11 @@
 
 All notable template-level changes are recorded here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; per-phase deltas with file-level detail and bug retros live in [`docs/dev/JOURNAL.md`](docs/dev/JOURNAL.md).
 
+## [Unreleased]
+
+### Changed
+- De-duplicated the EditMode-safe destroy guard: `Zero.UI.UiObjects.SafeDestroy` (internal) and `UnityPoolService.SafeDestroy` (private) were byte-identical. Consolidated into one `public static Zero.Infrastructure.Util.SafeDestroy(GameObject)` — both `Zero.UI` and `Zero.Services.Pool` already reference `Zero.Infrastructure`, so no asmdef-boundary or peer-rule violation (the original "duplicated to avoid a cross-asmdef ref into `Zero.Services.Pool`" rationale overlooked `Zero.Infrastructure` as a shared home). `UiObjects` removed. No behavior change. The two consolidated symbols were not consumer-visible (`internal` / `private`); the replacement `Zero.Infrastructure.Util.SafeDestroy` is intentionally `public` — a new (small) consumer-facing helper, and the designated home for further cross-cutting helpers.
+
 ## [0.2.3] — 2026-05-17 — Post-review cleanup
 
 Post-review pass (asmdef + pitfalls + architecture). No behavior change to shipped services; scope tightening + EditMode-safety hardening.

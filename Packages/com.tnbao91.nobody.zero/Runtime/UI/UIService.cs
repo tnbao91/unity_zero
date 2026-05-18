@@ -6,6 +6,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using Zero.Core;
 using Zero.Core.Events;
+using Zero.Infrastructure;
 using Object = UnityEngine.Object;
 
 namespace Zero.UI
@@ -168,7 +169,7 @@ namespace Zero.UI
                 if (popupComponent == null)
                 {
                     Debug.LogError($"[UI] Popup '{popupKey}' does not have PopupBase<{typeof(TData).Name}, {typeof(TResult).Name}> component", popupInstance);
-                    UiObjects.SafeDestroy(popupInstance);
+                    Util.SafeDestroy(popupInstance);
                     throw new InvalidOperationException($"Popup {popupKey} missing PopupBase component");
                 }
 
@@ -194,8 +195,8 @@ namespace Zero.UI
                 }
                 catch (OperationCanceledException)
                 {
-                    UiObjects.SafeDestroy(popupInstance);
-                    if (backdrop != null) UiObjects.SafeDestroy(backdrop);
+                    Util.SafeDestroy(popupInstance);
+                    if (backdrop != null) Util.SafeDestroy(backdrop);
                     if (_activePopups.Count > 0) _activePopups.Pop();
                     _popupStacks[Core.UiLayer.Popup].TryPop(out _);
                     throw;
@@ -219,8 +220,8 @@ namespace Zero.UI
 
                 // Close the popup
                 await popupComponent.OnCloseAsync(result, ct);
-                UiObjects.SafeDestroy(popupInstance);
-                if (backdrop != null) UiObjects.SafeDestroy(backdrop);
+                Util.SafeDestroy(popupInstance);
+                if (backdrop != null) Util.SafeDestroy(backdrop);
 
                 // Pop from stack
                 _popupStacks[Core.UiLayer.Popup].TryPop(out _);
@@ -262,8 +263,8 @@ namespace Zero.UI
                 handle.Cancel();
 
                 // Destroy the popup and its backdrop
-                UiObjects.SafeDestroy(popupInstance);
-                if (backdrop != null) UiObjects.SafeDestroy(backdrop);
+                Util.SafeDestroy(popupInstance);
+                if (backdrop != null) Util.SafeDestroy(backdrop);
 
                 // Pop from stack
                 _popupStacks[Core.UiLayer.Popup].TryPop(out _);
