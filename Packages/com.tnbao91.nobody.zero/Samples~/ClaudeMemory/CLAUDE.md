@@ -34,6 +34,7 @@ If you find yourself wanting to edit a file inside `Packages/com.tnbao91.nobody.
 - Subscribe to `IEventBus.On<T>()` via lambda without `using R3;` at the top of the file. The lambda binds to the wrong overload (CS1660).
 - Use `dynamic` in Runtime code. IL2CPP/AOT does not support the DLR.
 - Edit anything inside `Packages/com.tnbao91.nobody.zero/`. Package updates will overwrite your edits.
+- Edit a test to make it agree with the spec when the two disagree. Tests are the executable spec and the final authority — fix the prose spec, never weaken the test to match it.
 
 ## Workflow
 

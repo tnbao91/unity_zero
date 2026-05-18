@@ -12,9 +12,9 @@ The repo ships named sub-agents under `.claude/agents/`. Pick the tier that matc
 | Tier | Agent | Use for | Don't use for |
 |---|---|---|---|
 | Architecture | `unity-lead` (opus) | Phase planning, breaking-change decisions, alternative selection (RegisterType vs RegisterFactory, real impl vs mock), phase-close audit (JOURNAL + CLAUDE sync). | Routine feature work (delegate to senior); boilerplate (delegate to scaffolder/junior). |
-| Feature implementation | `unity-senior` (sonnet) | End-to-end feature: new service following 5-step convention, bootstrap step, single-module refactor, docs co-located with service, EditMode/PlayMode tests. | Architecture decisions (escalate to lead); pure scaffolding (delegate to scaffolder). |
+| Feature implementation | `unity-senior` (sonnet) | End-to-end feature: new service following the service convention (interface → RED test → impl → installer → wire), bootstrap step, single-module refactor, docs co-located with service. Must show the RED test run before impl. | Architecture decisions (escalate to lead); pure scaffolding (delegate to scaffolder). |
 | One-file scaffolding | `unity-junior` (haiku) | Lint/format fixes, NUnit test stubs, CHANGELOG entries, single-file sync from clear spec, `Mock<Name>Service` shells. | Cross-asmdef changes; new service end-to-end; architecture. |
-| Specialists | `service-scaffolder` (haiku) | Scaffold a new service end-to-end from a name + summary, following the 5-step convention exactly. Senior fills real logic after. | Fixing existing services; designing behavior. |
+| Specialists | `service-scaffolder` (haiku) | Scaffold a new service end-to-end from a name + summary, following the service convention exactly — including the failing EditMode test stub against the interface, named per the phase `## Spec`. Senior fills real logic until the named test goes GREEN. | Fixing existing services; designing behavior. |
 | Specialists | `asmdef-boundary-reviewer` (sonnet, read-only) | Pre-merge diff review for peer-rule violations, missing transitive refs, `autoReferenced` regressions. | Editing code. |
 | Specialists | `pitfalls-guard` (sonnet, read-only) | Pre-merge diff review against `docs/dev/PITFALLS.md` for re-occurring footguns. | Editing code. |
 
@@ -24,11 +24,14 @@ Consumer-side mirror set ships in `Packages/com.tnbao91.nobody.zero/Samples~/Cla
 
 Larger work is staged as **phases** per `PLAN.md` §3 and `JOURNAL.md`. The proven flow:
 
+> **Spec before commits (SDD guides, TDD decides).** The phase's spec is a `## Spec` block at the **top of its `JOURNAL.md` entry**, written *before any implementation commit lands*. It is the **first commit on the branch** (stub entry: heading + `## Spec` only); the rest of the entry — files touched, decisions, bugs caught — fills in at phase-close (two-write cadence; resolves the JOURNAL-is-a-phase-close-artifact tension). Content of `## Spec`: (a) user-visible behavior in 1–5 bullets, (b) acceptance criteria expressed as **concrete EditMode/PlayMode test names** (`Class.Method`) that will exist on this branch. The spec guides the AI; the named tests are the executable form and the **final authority** — if they disagree, the spec is wrong (see `CLAUDE.md` anti-patterns).
+
+0. Write the `## Spec` block as the first commit on the branch (stub `JOURNAL.md` entry: heading + `## Spec` only) — behavior bullets + acceptance criteria as concrete test names.
 1. Branch `phase-<N>-<short-name>` (or `feature/<topic>` for smaller items).
-2. **Spawn a junior subagent** (Haiku, `general-purpose` with `isolation: "worktree"`) to implement. Give it a self-contained brief that names every file path, every interface to add, every test to write. Subagent reads `PLAN.md` + tail of `JOURNAL.md` for context.
+2. **Spawn a junior subagent** (Haiku, `general-purpose` with `isolation: "worktree"`) to implement. The brief MUST cite (a) the `## Spec` block (which `JOURNAL.md` phase entry), (b) the exact failing test names from that spec's acceptance criteria, (c) every file path and interface to add. The subagent writes the named tests first, runs them, and **reports the RED result before writing any impl** — impl is "make these named tests GREEN", nothing more. Subagent reads `PLAN.md` + tail of `JOURNAL.md` (including the new `## Spec`) for context.
 3. **Lead review in main session** (Opus). Read every file the subagent wrote, every asmdef change, every test. Patch bugs in-place — Phase 4 round 1 caught 5 production bugs this way; Phase 5a round 1 caught 11.
 4. User verifies in Editor (compile clean + Test Runner green + Press Play Bootstrap.unity).
-5. Append `JOURNAL.md` entry with files touched, decisions, bugs caught.
+5. Complete the `JOURNAL.md` entry (the `## Spec` stub from step 0 already exists): files touched, decisions, bugs caught, verification status, resume hint.
 6. Update `CLAUDE.md` if any public surface or convention changed.
 7. Update `docs/dev/PITFALLS.md` if any new footgun surfaced.
 8. Merge `--no-ff` to `main`.
@@ -59,11 +62,11 @@ This pattern caught ~20 production bugs before user verification across phases 4
 Follow the convention precisely (also in `CLAUDE.md` — Service convention):
 
 1. Interface in `Packages/com.tnbao91.nobody.zero/Runtime/Core/Interfaces/I<Name>Service.cs` (`namespace Zero.Core`).
-2. Impl in `Packages/com.tnbao91.nobody.zero/Runtime/Services/<Name>/` with its own asmdef.
-3. `<Name>ServiceInstaller` static class with single `Install(ContainerBuilder builder)` + `RegisterType` call (`Lifetime.Singleton, Resolution.Lazy`). Use `RegisterFactory` if ctor takes non-contract params (e.g., `string`, primitive — see `VersionCheckServiceInstaller`).
-4. If async init needed: `<Name>Step : BootstrapStepBase` in `Runtime/Bootstrap/Steps/`.
-5. Wire in `ProjectScopeInstaller.InstallBindings` — add `Install(builder)` call AND add step to `steps` array in correct position.
-6. Add EditMode test under `Tests/EditMode/` covering happy path + edge cases.
+2. **EditMode test first (RED).** Write the behavior-anchored test under `Tests/EditMode/` against the interface from step 1 — happy path + edge cases, asserting *user-visible behavior* (state transitions, round-trips, documented thresholds), **not** "instantiate + assert non-null". Run it; it must fail (no impl yet). This RED run is the proof the test exercises real behavior, not a snapshot. The test names must match the phase `## Spec` acceptance criteria.
+3. Impl in `Packages/com.tnbao91.nobody.zero/Runtime/Services/<Name>/` with its own asmdef — written until step 2's test goes GREEN, nothing more.
+4. `<Name>ServiceInstaller` static class with single `Install(ContainerBuilder builder)` + `RegisterType` call (`Lifetime.Singleton, Resolution.Lazy`). Use `RegisterFactory` if ctor takes non-contract params (e.g., `string`, primitive — see `VersionCheckServiceInstaller`).
+5. If async init needed: `<Name>Step : BootstrapStepBase` in `Runtime/Bootstrap/Steps/`.
+6. Wire in `ProjectScopeInstaller.InstallBindings` — add `Install(builder)` call AND add step to `steps` array in correct position.
 7. Add `docs/services/<name>.md` matching fixed format (Overview/Public API/Extension Points/Examples/Known Limitations/Design Rationale).
 8. Update `CLAUDE.md` if new convention or footgun surfaced.
 

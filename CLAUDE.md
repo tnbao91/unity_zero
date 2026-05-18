@@ -23,7 +23,7 @@ Substitution suggestions are rejected on sight. The user picked these deliberate
 
 ## Core principles
 
-- **Service convention (5 steps).** Every service: interface in `Runtime/Core/Interfaces/I<Name>Service.cs` (namespace `Zero.Core`) → sealed impl in `Runtime/Services/<Name>/` with own `Zero.Services.<Name>.asmdef` → `<Name>ServiceInstaller` static class → optional `<Name>Step : BootstrapStepBase` → wire into `ProjectScopeInstaller.InstallBindings` (call `Install` + add step to `steps[]` in correct position). Reference impls: `LocalizationServiceInstaller`, `VersionCheckServiceInstaller` (the latter shows `RegisterFactory` for ctors with primitives).
+- **Service convention.** Every service: interface in `Runtime/Core/Interfaces/I<Name>Service.cs` (namespace `Zero.Core`) → **failing behavior-anchored EditMode test against that interface (RED before impl)** → sealed impl in `Runtime/Services/<Name>/` with own `Zero.Services.<Name>.asmdef` → `<Name>ServiceInstaller` static class → optional `<Name>Step : BootstrapStepBase` → wire into `ProjectScopeInstaller.InstallBindings` (call `Install` + add step to `steps[]` in correct position). Reference impls: `LocalizationServiceInstaller`, `VersionCheckServiceInstaller` (the latter shows `RegisterFactory` for ctors with primitives). Full ordered steps: `docs/dev/AGENT-WORKFLOW.md` §"Add a new service".
 - **Asmdef boundaries.** `Zero.Core` holds interfaces + POCOs only; never references service impls. `Zero.Gameplay`, `Zero.Meta`, `Zero.UI` are **peers** — they never reference each other. Cross-tier coupling goes through `IEventBus` only.
 - **Sealed services + interface seams.** Every impl is `sealed`. Extension is by swapping the binding (in `<Name>ServiceInstaller` or a consumer's `ProjectScopeInstaller.UserServices.cs` partial) or by decorator-wrapping. Never document "subclass and override".
 - **Mock-first defaults.** Third-party SDK integrations ship as `Mock<Name>Service`. Real adapters replace the binding per-game. Real impls already in the template wrap Unity-shipped packages (Localization, Mobile Notifications, ObjectPool, Audio Mixer, IAP). Details + key conventions per service in `docs/services/<name>.md`.
@@ -57,6 +57,7 @@ Substitution suggestions are rejected on sight. The user picked these deliberate
 - Use legacy `Input.*` API (`Input.touchCount`, `Input.GetKey`, `Input.mousePosition`...). Active Input Handling is "Input System Package" — legacy calls throw at runtime.
 - `RegisterType` for a ctor that takes a primitive or any unbound type. Use `RegisterFactory`.
 - Call `Object.Destroy` or `Object.DontDestroyOnLoad` without an `Application.isPlaying` guard (or use `UnityPoolService.SafeDestroy`). EditMode tests will throw.
+- Edit a test to make it agree with the spec when the two disagree. Tests are the executable spec and the final authority — fix the prose spec (the `## Spec` block in `JOURNAL.md`), never weaken the test to match it.
 - Use `dynamic` in Runtime code. IL2CPP/AOT does not support the DLR.
 - Subscribe to R3 streams via lambda without `using R3;` at the top of the file. The lambda will bind to the wrong overload (CS1660).
 - Use C# 10+ syntax (`record struct`, `init;`, `required`, file-scoped namespaces). Unity 6 = C# 9.
