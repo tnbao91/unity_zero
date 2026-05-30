@@ -43,6 +43,8 @@ namespace Zero.Services.Asset
         public async UniTask<IAssetHandle<T>> LoadAsync<T>(string key, CancellationToken ct = default)
             where T : UnityEngine.Object
         {
+            if (string.IsNullOrEmpty(key))
+                throw new ArgumentException("Asset key must be non-empty.", nameof(key));
             var op = Addressables.LoadAssetAsync<T>(key);
             try
             {
@@ -74,6 +76,7 @@ namespace Zero.Services.Asset
 
         public async UniTask<bool> HasKeyAsync<T>(string key, CancellationToken ct = default) where T : UnityEngine.Object
         {
+            if (string.IsNullOrEmpty(key)) return false;
             // Resolves to empty list if no entry — never throws InvalidKeyException.
             var op = Addressables.LoadResourceLocationsAsync(key, typeof(T));
             try

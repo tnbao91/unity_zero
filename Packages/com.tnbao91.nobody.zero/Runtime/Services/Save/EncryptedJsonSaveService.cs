@@ -199,6 +199,11 @@ namespace Zero.Services.Save
 
         public bool TryGet<T>(string key, out T value)
         {
+            if (string.IsNullOrEmpty(key))
+            {
+                value = default;
+                return false;
+            }
             lock (_dataLock)
             {
                 if (_data.TryGetValue(key, out var token) && token != null && token.Type != JTokenType.Null)
@@ -221,6 +226,8 @@ namespace Zero.Services.Save
 
         public void Set<T>(string key, T value)
         {
+            if (string.IsNullOrEmpty(key))
+                throw new ArgumentException("Save key must be non-empty.", nameof(key));
             lock (_dataLock)
             {
                 _data[key] = value == null ? JValue.CreateNull() : JToken.FromObject(value);
@@ -229,6 +236,8 @@ namespace Zero.Services.Save
 
         public void Delete(string key)
         {
+            if (string.IsNullOrEmpty(key))
+                throw new ArgumentException("Save key must be non-empty.", nameof(key));
             lock (_dataLock)
             {
                 _data.Remove(key);

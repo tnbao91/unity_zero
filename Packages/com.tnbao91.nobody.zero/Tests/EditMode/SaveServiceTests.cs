@@ -104,6 +104,33 @@ namespace Zero.Tests.EditMode
             second.Dispose();
         });
 
+        [Test]
+        public void Set_NullOrEmptyKey_Throws()
+        {
+            var s = new EncryptedJsonSaveService(new StubLogService());
+            Assert.Throws<ArgumentException>(() => s.Set<int>(null, 1));
+            Assert.Throws<ArgumentException>(() => s.Set("", 1));
+            s.Dispose();
+        }
+
+        [Test]
+        public void Delete_NullOrEmptyKey_Throws()
+        {
+            var s = new EncryptedJsonSaveService(new StubLogService());
+            Assert.Throws<ArgumentException>(() => s.Delete(null));
+            Assert.Throws<ArgumentException>(() => s.Delete(""));
+            s.Dispose();
+        }
+
+        [Test]
+        public void TryGet_NullOrEmptyKey_FailsSafe()
+        {
+            var s = new EncryptedJsonSaveService(new StubLogService());
+            Assert.IsFalse(s.TryGet<int>(null, out _), "Null key must fail safe, not throw");
+            Assert.IsFalse(s.TryGet<int>("", out _), "Empty key must fail safe, not throw");
+            s.Dispose();
+        }
+
         private sealed class StubLogService : ILogService
         {
             public bool IsEnabled { get; set; } = true;

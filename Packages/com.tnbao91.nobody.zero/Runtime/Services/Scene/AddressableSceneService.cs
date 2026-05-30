@@ -32,6 +32,8 @@ namespace Zero.Services.Scene
 
         public async UniTask LoadAsync(string sceneKey, IProgress<float> progress = null, CancellationToken ct = default)
         {
+            if (string.IsNullOrEmpty(sceneKey))
+                throw new ArgumentException("Scene key must be non-empty.", nameof(sceneKey));
             _log.Info($"[SCENE] Loading '{sceneKey}'...");
             var op = Addressables.LoadSceneAsync(sceneKey, LoadSceneMode.Single, activateOnLoad: true);
             await op.ToUniTask(progress: progress, cancellationToken: ct);
