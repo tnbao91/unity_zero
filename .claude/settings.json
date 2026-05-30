@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Read(./Assets/Resources/ZeroSecrets.asset)",
+      "Read(./**/*.keystore)",
+      "Read(./**/keystore.properties)",
+      "Read(./**/*.p12)",
+      "Read(./**/*.mobileprovision)",
+      "Read(./.env)",
+      "Read(./**/.env.*)"
+    ]
+  }
+}

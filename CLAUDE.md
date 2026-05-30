@@ -29,6 +29,7 @@ Substitution suggestions are rejected on sight. The user picked these deliberate
 - **Mock-first defaults.** Third-party SDK integrations ship as `Mock<Name>Service`. Real adapters replace the binding per-game. Real impls already in the template wrap Unity-shipped packages (Localization, Mobile Notifications, ObjectPool, Audio Mixer, IAP). Details + key conventions per service in `docs/services/<name>.md`.
 - **Gameplay is genre-agnostic.** `Zero.Gameplay` ships only state-machine + level-loading scaffolds + lifecycle events. Grid/runner/idle/merge/match-3 systems are out of scope — they live in the consumer's game asmdef.
 - **Consumer owns scenes and UI roots.** Only `Bootstrap.unity` is in build settings. UI layer canvases are not spawned by the framework — consumer attaches a `UIRoot` MonoBehaviour with 4 Transform slots. Loading screens, popups, screens, toasts are loaded by Addressables key conventions (`ui/popup/<name>`, etc.) provided by the consumer.
+- **Validate inputs at service boundaries.** Every public service method guards caller-supplied input (keys, ids, indices, durations) before use: write/action methods throw on invalid input, query methods fail safe (return `false`/empty/no-op). Precedents: `UnityPoolService.PrewarmAsync` (throws), `EncryptedJsonSaveService.TryGet` + `UnityLocalizationService.Get` (fail safe). Mechanics + the Addressables-key footgun: `docs/dev/PITFALLS.md` → "Validate inputs at service boundaries" and "Addressables logs the red exception BEFORE your try/catch sees it".
 
 ## Testing principles
 
@@ -41,6 +42,12 @@ Substitution suggestions are rejected on sight. The user picked these deliberate
 - **Phenomenon → hypothesis → test → fix.** When chasing a bug: state the observed phenomenon, form a hypothesis, write an EditMode/PlayMode test that *would fail iff the hypothesis is true*, confirm it fails, then fix until it passes. A green test without a prior red is not evidence.
 - **Git history is memory.** Before fixing, `git log --grep="<keyword>"` and look at the diff for similar fixes. Many bugs are regressions of past fixes — don't re-pay the cost.
 - **Same-shape sweep after a fix.** When you find one occurrence of a footgun, grep for the rest. Phase 4 round 2 found three test files all missing `using R3;` together.
+
+## Honesty & uncertainty
+
+- **Only act at 100% certainty; otherwise ask.** When the request, the code, or a tool result is ambiguous, ask the user instead of guessing. A confident-looking wrong guess costs more than a question.
+- **Verify before you claim.** Never assert a `file:line`, a symbol, or a behavior you have not actually read *this session*. A cancelled or unrendered tool call is not evidence — re-read before relying on it. If a check could not complete, say so explicitly rather than presenting an assumption as a finding.
+- **Report outcomes faithfully.** Claude cannot open Unity (see *Build & test*) — when a change needs Editor verification, say so; never claim tests pass that you did not run.
 
 ## Automated gate before PR
 
@@ -61,6 +68,9 @@ Substitution suggestions are rejected on sight. The user picked these deliberate
 - Use `dynamic` in Runtime code. IL2CPP/AOT does not support the DLR.
 - Subscribe to R3 streams via lambda without `using R3;` at the top of the file. The lambda will bind to the wrong overload (CS1660).
 - Use C# 10+ syntax (`record struct`, `init;`, `required`, file-scoped namespaces). Unity 6 = C# 9.
+- Assert a `file:line`, symbol, or behavior you have not read this session, or claim Editor-only tests passed without running them. Verify before claiming; ask when unsure.
+- Accept caller-supplied keys/ids/indices into a public service method without a guard (null/empty/range).
+- Allocate per-frame in `Update`/`LateUpdate`/`OnGUI` (`new` array/list, LINQ, string interpolation). Reuse buffers; build strings only when the value changes.
 
 ## Build & test
 
