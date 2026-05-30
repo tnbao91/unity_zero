@@ -82,6 +82,20 @@ for (int i = 0; i < count; i++) pool.Release(held[i]);
 
 `autoReferenced: false` is set on every Zero asmdef so dependencies stay explicit. The cost is that adding a dep requires editing both consumer and (when adding a new service) `Zero.Bootstrap.asmdef`. Three traps:
 
+### `Zero.Core` may depend on UnityEngine ONLY where the Unity type is the domain
+
+`Zero.Core` is interfaces + POCOs and stays as Unity-independent as practical so game logic is testable without the Editor. Exactly three interfaces legitimately pull `using UnityEngine` because the Unity type *is* the domain and abstracting it would be empty ceremony (the only impl would still wrap the same Unity type, and you still couldn't test without Unity):
+
+- `IPoolService` / `IPool<T>` — `where T : UnityEngine.Object`, plus `Vector3`/`Quaternion` for spawn placement. A pool produces Unity prefabs; that's the point.
+- `IUIService` — `Transform` for layer roots. A UI layer root *is* a `Transform`.
+- `IInputService` — `Vector2` for pointer positions (value type, still test-friendly).
+
+This is an accepted, bounded exception — **not** a precedent. Every NEW Core interface (save / config / analytics / remote / etc.) must be Unity-free: use C# primitives and POCO DTOs. If you find yourself adding `using UnityEngine` to a new file under `Runtime/Core/`, stop and replace the Unity type with a struct/primitive. Sanity check before merge — must return only those three files:
+
+```bash
+grep -rl "using UnityEngine" Packages/com.tnbao91.nobody.zero/Runtime/Core
+```
+
 ### Transitive types leaking through wrapped Unity packages
 
 When wrapping a Unity package, the wrapper's public/internal API surface may expose types from a *different* assembly. The asmdef must list both.
@@ -197,6 +211,15 @@ When adding a step: extend `BootstrapStepBase`, override `Name`, set `IsCritical
 The template ships with empty defaults for many third-party integrations. Any service that wraps a Unity package with required setup (Localization tables, Mobile Notifications channels, etc.) must short-circuit with a warning when the setup is missing — otherwise a fresh clone won't run.
 
 `LocalizationStep` is the canonical example: it guards with `LocalizationSettings.HasSettings` and wraps `InitializationOperation.ToUniTask()` in `try/catch` so a fresh template (no Localization assets, no built Addressables) logs a warning instead of throwing red `InvalidKeyException` errors that look like app-killing problems.
+
+### Validate inputs at service boundaries
+
+Every public service method must guard caller-supplied input (Addressables/scene/save keys, notification ids, indices, durations) before using it — a forwarded null/empty key silently corrupts the save blob or produces a misleading red Addressables error. The split:
+
+- **Write / action methods throw** on invalid input: `EncryptedJsonSaveService.Set`/`Delete` throw `ArgumentException` on null/empty key; `AddressableAssetService.LoadAsync` and `AddressableSceneService.LoadAsync` throw on empty key; `UnityMobileNotificationService.Schedule` throws on empty id/title and on negative `delay`. Precedent for throwing: `UnityPoolService.PrewarmAsync` (`ArgumentNullException` on null prefab).
+- **Query methods fail safe** (no throw): `EncryptedJsonSaveService.TryGet` returns `false`, `AddressableAssetService.HasKeyAsync` returns `false`, `UnityLocalizationService.Get` returns `string.Empty`.
+
+Don't add a `HasKeyAsync` round-trip in front of a `LoadAsync` that must throw on a genuine miss anyway — guard the string and let the load report the real miss. (See the separate Addressables-red-log note for when the pre-check *does* pay off: optional content the consumer expects to be absent.)
 
 ### Sealed services + interface seams
 

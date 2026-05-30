@@ -95,12 +95,14 @@ namespace Zero.Services.Input
             private Vector2 _pointerDownPos;
             private float _pointerDownTime;
             private Vector2 _lastPointerPos;
-            private UnityEngine.InputSystem.EnhancedTouch.Touch[] _previousTouches;
+            // Fixed two-slot buffer reused every frame; _previousTouchCount tells how many are valid.
+            private readonly UnityEngine.InputSystem.EnhancedTouch.Touch[] _previousTouches =
+                new UnityEngine.InputSystem.EnhancedTouch.Touch[2];
+            private int _previousTouchCount;
 
             public void Initialize(UnityInputService service)
             {
                 _service = service;
-                _previousTouches = new UnityEngine.InputSystem.EnhancedTouch.Touch[0];
             }
 
             public void Shutdown()
@@ -197,29 +199,29 @@ namespace Zero.Services.Input
 
                 if (activeTouches.Count < 2)
                 {
-                    _previousTouches = new UnityEngine.InputSystem.EnhancedTouch.Touch[0];
+                    _previousTouchCount = 0;
                     return;
                 }
 
-                if (activeTouches.Count >= 2)
+                var touch1 = activeTouches[0];
+                var touch2 = activeTouches[1];
+
+                float currentDistance = Vector2.Distance(touch1.screenPosition, touch2.screenPosition);
+
+                if (_previousTouchCount >= 2)
                 {
-                    var touch1 = activeTouches[0];
-                    var touch2 = activeTouches[1];
-
-                    float currentDistance = Vector2.Distance(touch1.screenPosition, touch2.screenPosition);
-
-                    if (_previousTouches.Length >= 2)
+                    float previousDistance = Vector2.Distance(_previousTouches[0].screenPosition, _previousTouches[1].screenPosition);
+                    if (previousDistance > 0)
                     {
-                        float previousDistance = Vector2.Distance(_previousTouches[0].screenPosition, _previousTouches[1].screenPosition);
-                        if (previousDistance > 0)
-                        {
-                            float scaleRatio = currentDistance / previousDistance;
-                            _service._onPinch.OnNext(scaleRatio);
-                        }
+                        float scaleRatio = currentDistance / previousDistance;
+                        _service._onPinch.OnNext(scaleRatio);
                     }
-
-                    _previousTouches = new[] { touch1, touch2 };
                 }
+
+                // Reuse the fixed buffer — no per-frame allocation.
+                _previousTouches[0] = touch1;
+                _previousTouches[1] = touch2;
+                _previousTouchCount = 2;
             }
 
             private bool _wasPointerDown;

@@ -95,6 +95,12 @@ namespace Zero.Services.Notification
 
         public void Schedule(string id, string title, string body, TimeSpan delay)
         {
+            if (string.IsNullOrEmpty(id))
+                throw new ArgumentException("Notification id must be non-empty.", nameof(id));
+            if (string.IsNullOrEmpty(title))
+                throw new ArgumentException("Notification title must be non-empty.", nameof(title));
+            if (delay < TimeSpan.Zero)
+                throw new ArgumentOutOfRangeException(nameof(delay), "Notification delay must be non-negative.");
 #if UNITY_ANDROID || UNITY_IOS || UNITY_EDITOR
             try
             {

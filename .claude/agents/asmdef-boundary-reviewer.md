@@ -50,6 +50,14 @@ grep -E '"Zero\.Services\.' Packages/com.tnbao91.nobody.zero/Runtime/Core/Zero.C
 ```
 Must return empty.
 
+**Unity-type leak into new Core interfaces.** Only three Core interfaces may pull `using UnityEngine` — `IPoolService`, `IUIService`, `IInputService` (the Unity type is the domain there; see `docs/dev/PITFALLS.md` → "Zero.Core may depend on UnityEngine ONLY where the Unity type is the domain"). If the diff adds `using UnityEngine` — or exposes a Unity type (`Transform`, `GameObject`, `UnityEngine.Object`, `Texture`, `Sprite`, `AssetReference`, ...) — in any OTHER file under `Runtime/Core/`, flag it as P1 and suggest a POCO/primitive replacement:
+
+```bash
+# Should list only IPoolService.cs, IUIService.cs, IInputService.cs
+grep -rl "using UnityEngine" Packages/com.tnbao91.nobody.zero/Runtime/Core
+```
+Any fourth file in the output is a regression.
+
 ### 5. New service wired through `ProjectScopeInstaller`
 
 If a new `<Name>ServiceInstaller` was added, it must be called in `Runtime/Bootstrap/ProjectScopeInstaller.InstallBindings`. If a `<Name>Step` was added, it must appear in the `steps[]` array. Both `Zero.Bootstrap.asmdef` references and the using directives in `ProjectScopeInstaller.cs` must include the new `Zero.Services.<Name>` assembly.
