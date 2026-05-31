@@ -1,6 +1,10 @@
 {
-  "_comment": "Example .claude/settings.json for projects using com.tnbao91.nobody.zero. Move to YOUR repo's .claude/settings.json. Adjust permissions to your team's risk tolerance — these are conservative defaults that allow common read-only Unity dev queries without prompting.",
+  "_comment": "Example .claude/settings.json for projects using com.tnbao91.nobody.zero. Move to YOUR repo's .claude/settings.json. Adjust permissions to your team's risk tolerance — these are conservative defaults that allow common read-only Unity dev queries without prompting. The deny rules enforce the package boundary: the template is read-only for consumers (updates come via Package Manager), so edits to ./Packages/com.tnbao91.nobody.zero/** are blocked — consumer wiring goes through a ProjectScopeInstaller.UserServices.cs partial in YOUR asmdef instead. NOTE: this rule only matches an EMBEDDED package under ./Packages/. A UPM/OpenUPM install resolves to a read-only Library/PackageCache/ path the OS already protects, so this is belt-and-suspenders, not the sole guard.",
   "permissions": {
+    "deny": [
+      "Edit(./Packages/com.tnbao91.nobody.zero/**)",
+      "Write(./Packages/com.tnbao91.nobody.zero/**)"
+    ],
     "allow": [
       "Bash(git status)",
       "Bash(git diff:*)",
