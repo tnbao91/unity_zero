@@ -4,6 +4,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; per-ph
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-05-31 — AI agent harness guardrails
+
+Safe drop-in upgrade — no runtime/service behavior change. The consumer-facing delta is in the `ClaudeMemory` sample.
+
+### Added
+- `Samples~/ClaudeMemory`: three game-tuned slash commands — `/phase-open` (branch + name RED-first behavior tests), `/phase-close` (game-lead pre-merge audit), `/pre-pr` (fan out boundary + pitfalls reviewers, then `/code-review`) — and a `.claude/settings.example.json` `deny` rule blocking edits inside the package. **Re-import the sample** (Package Manager → Zero → Samples → ClaudeMemory) to pick these up.
+
 ### Changed
 - Internal refactor, no behavior change, safe drop-in: de-duplicated the EditMode-safe destroy guard into `Zero.Infrastructure.Util.SafeDestroy(GameObject)`. Replaces the byte-identical `Zero.UI.UiObjects.SafeDestroy` (`internal`, now removed) and `UnityPoolService.SafeDestroy` (`private`). No behavior change. Net consumer API delta: one new `public` helper `Zero.Infrastructure.Util.SafeDestroy(GameObject)` (nothing removed from the consumer surface).
 

@@ -4,6 +4,13 @@ All notable template-level changes are recorded here. Format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-05-31 — AI agent harness guardrails
+
+### Added
+- **AI agent harness guardrails** (repo-side dev tooling). Footgun rules are now enforced at the least-powerful tool that can decide them — one catalog (`docs/dev/PITFALLS.md` → new "Enforcement surface" legend), three surfaces: **permission** (`.claude/settings.json` read-only allow-list + `ask` on dep/version files), **hook** (`.claude/hooks/check-footguns.sh`, warn-only `PostToolUse` catching the context-free subset — legacy `Input.*`, `dynamic`, C# 10 syntax, `Subscribe` without `using R3;`), **agent** (`pitfalls-guard` / `asmdef-boundary-reviewer` for judgment checks).
+- Three repo-side slash commands packaging existing workflows: `/phase-open`, `/phase-close`, `/pre-pr`.
+- Consumer sample (`Samples~/ClaudeMemory`): mirrored game-tuned `/phase-open`, `/phase-close`, `/pre-pr`, plus a `settings.example.json` `deny` rule that blocks edits inside the package. **Re-import the sample to get them.**
+
 ### Changed
 - De-duplicated the EditMode-safe destroy guard: `Zero.UI.UiObjects.SafeDestroy` (internal) and `UnityPoolService.SafeDestroy` (private) were byte-identical. Consolidated into one `public static Zero.Infrastructure.Util.SafeDestroy(GameObject)` — both `Zero.UI` and `Zero.Services.Pool` already reference `Zero.Infrastructure`, so no asmdef-boundary or peer-rule violation (the original "duplicated to avoid a cross-asmdef ref into `Zero.Services.Pool`" rationale overlooked `Zero.Infrastructure` as a shared home). `UiObjects` removed. No behavior change. The two consolidated symbols were not consumer-visible (`internal` / `private`); the replacement `Zero.Infrastructure.Util.SafeDestroy` is intentionally `public` — a new (small) consumer-facing helper, and the designated home for further cross-cutting helpers.
 
