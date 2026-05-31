@@ -13,7 +13,8 @@ This sample bundle gives Claude Code (and other AI coding agents) the context th
 | `claude-context/stack-constraints.md` | What's locked and why. Pushback rules when AI suggests substitutes. |
 | `claude-context/pitfalls.md` | Top consumer-relevant footguns. Each came from a real bug. |
 | `.claude/agents/*.md` | Six pre-built Claude Code sub-agents tuned for game-on-Zero work: `game-lead` (opus, architecture), `game-senior` (sonnet, implementation), `game-junior` (haiku, boilerplate), plus three specialists — `asmdef-boundary-reviewer`, `service-scaffolder`, `pitfalls-guard`. Pick the right tier per task; specialists are auto-suggested for boundary/footgun review. |
-| `.claude/settings.example.json` | Permissions skeleton for fewer prompt interruptions. |
+| `.claude/commands/*.md` | Three slash commands packaging repeated workflows: `/phase-open` (branch + name RED-first behavior tests), `/phase-close` (game-lead pre-merge audit), `/pre-pr` (fan out boundary + pitfalls reviewers, then `/code-review`). |
+| `.claude/settings.example.json` | Permissions skeleton for fewer prompt interruptions + a deny rule that blocks edits inside the package. |
 
 ## How to use
 
@@ -22,7 +23,8 @@ This sample bundle gives Claude Code (and other AI coding agents) the context th
 3. **Move** the `claude-context/` folder to your repo root too.
 4. **Move** `.claude/settings.example.json` to `.claude/settings.json` at repo root (adjust permissions for your team's risk tolerance).
 5. **Move** the entire `.claude/agents/` folder to your repo root (next to `.claude/settings.json`). Verify with `/agents` inside Claude Code — the six game agents should appear.
-6. **Delete** `Assets/Samples/com.tnbao91.nobody.zero/<version>/ClaudeMemory/` — the originals stay shipped in the package, you only need the copies at repo root.
+6. **Move** the `.claude/commands/` folder to your repo root too. Verify with `/` inside Claude Code — `/phase-open`, `/phase-close`, `/pre-pr` should appear.
+7. **Delete** `Assets/Samples/com.tnbao91.nobody.zero/<version>/ClaudeMemory/` — the originals stay shipped in the package, you only need the copies at repo root.
 
 After this, when Claude Code starts in your repo, it auto-reads `CLAUDE.md` and finds the rest via the relative paths.
 
