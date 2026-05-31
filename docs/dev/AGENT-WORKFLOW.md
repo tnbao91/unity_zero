@@ -55,6 +55,14 @@ This pattern caught ~20 production bugs before user verification across phases 4
 - **Add a real third-party SDK to the template** — Mock + extension recipe pattern only. Localization and Notifications are the documented exceptions (they wrap Unity-shipped packages).
 - **Touch the peer rule** — Gameplay/UI/Meta cannot reference each other. `grep "Zero.UI\|Zero.Meta" Zero.Gameplay.asmdef` must stay empty. Codex review will flag any violation.
 
+## Slash commands
+
+Three repeated workflows below are packaged as `.claude/commands/` so they're one-shot callable (thin wrappers that cite this doc + the agent checklists — they don't duplicate the prose):
+
+- `/phase-open <n> <short-name>` — branch + write the `## Spec` stub as the first commit (step 0–1 below).
+- `/phase-close` — run the `unity-lead` 6-item phase-close audit; verdict MERGE-READY / BLOCKED.
+- `/pre-pr [base]` — fan out `asmdef-boundary-reviewer` + `pitfalls-guard` on the diff, then `/code-review`.
+
 ## Common workflows for AI-assisted contributions
 
 ### Add a new service
