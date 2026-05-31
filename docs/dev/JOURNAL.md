@@ -316,3 +316,16 @@ Follow-up on the round-B decision above. `Zero.UI.UiObjects.SafeDestroy` (intern
 - Call sites repointed: `ToastQueue` (×1), `ScreenManager` (×2), `UIService` (×6), `UnityPoolService` (×2 — `Dispose`, nested `GameObjectPool.OnDestroy`). Added `using Zero.Infrastructure;` to the 4 files. `ScreenManagerEditModeDestroyTests` doc comment updated (`UiObjects` → `Util`).
 - No behavior change. The two old symbols were not consumer-visible (`internal`/`private`); the replacement `Util` is deliberately `public` (general cross-cutting home per the requested intent), so the net consumer API delta is *one added* `public` helper, nothing removed. Grep green: zero `UiObjects` refs remain in `Packages/`+`Assets/`. CHANGELOG (root + package) under `[Unreleased]`. **Not** version-bumped — additive-only, no removal/break; defer the patch bump + tag to the next release batch.
 - Verification: static greps only. **Editor (Play `Bootstrap.unity` + Test Runner EditMode/PlayMode, esp. `ScreenManagerEditModeDestroyTests`) pending — Claude cannot open Unity; user to confirm.**
+
+---
+
+## v0.3.0 — 2026-05-31 (`feature/agentic-harness-guardrails`, merged to `main` — commits `ed134d3`/`5daab6c`)
+
+Release entry. Closes out the deferred bumps from the two `[Unreleased]` entries above (post-review cleanup + SafeDestroy de-dup) — both ship under this tag. Repo-side dev-tooling release; **no runtime API change** beyond the already-noted `public Zero.Infrastructure.Util.SafeDestroy`.
+
+- **AI agent harness guardrails.** Footgun rules are now enforced at the least-powerful tool that can decide them — one catalog (`docs/dev/PITFALLS.md` → new "Enforcement surface" legend), three surfaces: **permission** (`.claude/settings.json` read-only allow-list + `ask` on dep/version files), **hook** (`.claude/hooks/check-footguns.sh`, warn-only `PostToolUse` catching the context-free subset — legacy `Input.*`, `dynamic`, C# 10 syntax, `Subscribe` without `using R3;`), **agent** (`pitfalls-guard` / `asmdef-boundary-reviewer` for judgment checks). The hook nudges; the agents + CI are the hard gate.
+- **Three repo-side slash commands** packaging existing workflows: `/phase-open`, `/phase-close`, `/pre-pr`.
+- **Consumer sample mirror** (`Samples~/ClaudeMemory`): game-tuned `/phase-open`, `/phase-close`, `/pre-pr` + a `settings.example.json` `deny` rule blocking edits inside the package. Consumers must re-import the sample to get them.
+- **SafeDestroy de-dup** (rolled in from the `[Unreleased]` entry above): consolidated into one `public static Zero.Infrastructure.Util.SafeDestroy(GameObject)`. No behavior change.
+- Verification: lint + Test Runner via `game-ci` CI (`.github/workflows/{lint,tests}.yml`). Tag `v0.3.0` + GitHub release created post-merge.
+- Resume hint: docs-only follow-up since — backfilled the 6 infra/policy service docs (`asset`, `scene`, `log`, `device-profile`, `events`, `adplacement`) that lacked a `docs/services/*.md`. No open phase.
