@@ -55,6 +55,7 @@ Substitution suggestions are rejected on sight. The user picked these deliberate
 - `.github/workflows/tests.yml` (CI) — Unity Test Runner EditMode + PlayMode headless via `game-ci`.
 - Both must be green before merge. Never bypass `--no-verify` / `--no-gpg-sign` unless the user explicitly asks.
 - AI-side review: spawn `asmdef-boundary-reviewer` + `pitfalls-guard` on the diff before opening the PR.
+- **Harness guardrails (inline, during editing).** Footguns are enforced at the least-powerful tool that can decide them — one catalog (`docs/dev/PITFALLS.md` → "Enforcement surface"), three surfaces: **permission** (path rules in `.claude/settings.json` + consumer `settings.example.json` block edits inside the package / `ask` on deps + version files), **hook** (`.claude/hooks/check-footguns.sh`, warn-only `PostToolUse` catching the context-free subset — legacy `Input.*`, `dynamic`, C# 9 violations, `using R3;`), **agent** (the two reviewers above, for judgment checks). The hook nudges; the agents + CI are the hard gate.
 
 ## Anti-patterns (do not)
 

@@ -4,6 +4,20 @@ This file collects concrete pitfalls hit during the Unity Zero v2 implementation
 
 ---
 
+## Enforcement surface (one catalog, three surfaces)
+
+This file is the **single source of truth** for the footgun catalog. Each footgun is enforced at the *least-powerful tool that can decide it* — don't duplicate a rule across surfaces, or they drift.
+
+| Surface | What it catches | Where it lives |
+|---|---|---|
+| **permission** | Path-based rules, no file content needed. Block edits inside the package from consumer side; `ask` before touching deps/version files. | `.claude/settings.json` (repo) + `Samples~/ClaudeMemory/.claude/settings.example.json` (consumer) |
+| **hook** (warn-only) | The *context-free* subset — single-file, regex-decidable patterns a permission can't see *inside* content: legacy `Input.*`, `dynamic`, C# 10 syntax, `Subscribe(...)` without `using R3;`. Prints `⚠ footgun:` and never blocks. | `.claude/hooks/check-footguns.sh`, wired as `PostToolUse(Edit\|Write)` |
+| **agent** (judgment) | Everything that needs reasoning or cross-file context: `RegisterType` w/ primitive ctor, Addressables `HasKeyAsync` pre-check, input-validation-at-boundary, asmdef peer/transitive refs, sealed-class "subclass" docs, type-name collisions. | `pitfalls-guard` + `asmdef-boundary-reviewer` agents (read-only diff review pre-PR) |
+
+A footgun tagged **[hook]** below is *also* re-checked by the agent on the full diff — the hook is a fast inline nudge during editing, the agent is the pre-merge gate. CI (`lint.yml` + `tests.yml`) remains the hard gate behind both. Entries with no tag are agent-only judgment.
+
+---
+
 ## EditMode safety (production code must run in EditMode)
 
 Unity's editor APIs reject several runtime calls when invoked from editor scripts or EditMode tests. Production code that ships these calls without guards looks fine in play mode and silently fails the moment it runs in tests or tooling.
@@ -153,10 +167,12 @@ To instantiate a class that isn't registered as a Reflex contract (e.g. `IConsol
 If a service's most-parameters ctor takes any value Reflex can't resolve from the container (`string`, `int`, raw `Func<>`, any unbound type), `RegisterType` throws `UnknownContractException` at first resolve. Use `builder.RegisterFactory<TContract>(c => new Impl(c.Resolve<X>(), literalOrComputedValue), contracts, lifetime, resolution)` instead. `VersionCheckServiceInstaller` is the canonical example — supplies `Application.version` for the `string localVersion` ctor parameter so tests can inject a known semver while production reads the real value.
 
 ### Active Input Handling is "Input System Package" — legacy `Input.*` APIs throw
+*Enforced by: `[hook + agent]`*
 
 Phase 2 set Active Input Handling to "Input System Package" only. Anywhere you reach for `Input.touchCount`, `Input.GetTouch(0)`, `Input.GetKey`, `Input.mousePosition` etc., the call throws at runtime. Use the new API: `Keyboard.current.<key>Key.wasPressedThisFrame`, `Mouse.current.position.value`, `Touchscreen.current.touches`, or go through `IInputService`/`EnhancedTouch` for gestures. Phase 5a `CheatConsole` round 1 had a 4-finger toggle implemented via `Input.touchCount` — only caught in review.
 
 ### `Observable<T>.Subscribe(Action<T>)` requires `using R3;` at the call site
+*Enforced by: `[hook + agent]`*
 
 `R3.Observable<T>` only declares `Subscribe(Observer<T>)` as a class member. `Subscribe(Action<T> onNext)` is an **extension method** in the `R3` namespace. A test file that uses `bus.On<TEvent>().Subscribe(evt => ...)` without `using R3;` compiles to the `Observer<T>` overload and emits `CS1660: Cannot convert lambda expression to type 'Observer<T>' because it is not a delegate type`. This bit Phase 4 round 2 in two test files. Always add `using R3;` to any file that subscribes via lambda — even if the file doesn't otherwise reference R3 types directly (the extension lookup still needs the namespace in scope).
 
@@ -312,6 +328,7 @@ For one-shot loads (e.g. SFX), wrap the play/await/cleanup in `try { ... } final
 For long-lived loads (e.g. mixer, current music clip), store the handle in a field and dispose it in `Dispose()` (or before re-loading the slot).
 
 ### Don't use `dynamic` in Unity runtime code
+*Enforced by: `[hook + agent]`*
 
 The C# `dynamic` keyword requires `Microsoft.CSharp.dll` and the DLR (Dynamic Language Runtime). **IL2CPP AOT does not support the DLR**, so any code that uses `dynamic` will compile fine in Editor + Mono builds, but fail at link time on iOS App Store, Android IL2CPP, and WebGL deployment.
 
