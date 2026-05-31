@@ -53,7 +53,7 @@ openupm add com.tnbao91.nobody.zero
 
 Or `Add package by name` → `com.tnbao91.nobody.zero`.
 
-> Pin `0.2.1` or later. Tags `v0.1.0` / `v0.2.0` are broken (missing `Runtime/Services/Log/` from a `.gitignore` collision); see the [CHANGELOG](CHANGELOG.md) `0.2.1` entry.
+> Latest is `0.3.0`. Pin `0.2.1` or later — tags `v0.1.0` / `v0.2.0` are broken (missing `Runtime/Services/Log/` from a `.gitignore` collision); see the [CHANGELOG](CHANGELOG.md) `0.2.1` entry.
 
 ### 4. Import Bootstrap sample
 
@@ -160,6 +160,7 @@ When editing the package: the dev `Assets/_Project/Scenes/Bootstrap.unity` is th
 
 - **Architecture** — [event bus](docs/architecture/event-bus.md), [bootstrap pipeline](docs/architecture/bootstrap-pipeline.md), [asmdef graph](docs/architecture/asmdef-graph.md).
 - **Services (real impls)** — [save](docs/services/save.md), [localization](docs/services/localization.md), [pool](docs/services/pool.md), [audio](docs/services/audio.md), [input](docs/services/input.md), [notification](docs/services/notification.md), [version-check](docs/services/version-check.md), [time](docs/services/time.md).
+- **Services (infra & policy)** — [asset](docs/services/asset.md), [scene](docs/services/scene.md), [log](docs/services/log.md), [device-profile](docs/services/device-profile.md), [events](docs/services/events.md), [adplacement](docs/services/adplacement.md).
 - **Services (mocks + extension recipes)** — [crashlytics](docs/services/crashlytics.md), [consent](docs/services/consent.md), [remote-config](docs/services/remote-config.md), [analytics](docs/services/analytics.md), [attribution](docs/services/attribution.md), [ads](docs/services/ads.md), [iap](docs/services/iap.md), [receipt-validator](docs/services/receipt-validator.md).
 - **UI** — [popup-stack](docs/ui/popup-stack.md), [ui-root](docs/ui/ui-root.md), [loading-screen](docs/ui/loading-screen.md), [safe-area](docs/ui/safe-area.md), [toast](docs/ui/toast.md), [localized-text](docs/ui/localized-text.md).
 - **Gameplay** — [state-machine](docs/gameplay/state-machine.md), [level-loading](docs/gameplay/level-loading.md).
