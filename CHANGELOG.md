@@ -4,6 +4,30 @@ All notable template-level changes are recorded here. Format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-06-11 — Production hardening (Phase 6)
+
+Hardening pass driven by a full-framework review (3 audit agents + line-level manual verification + design review). Minor bump: additive public API (bootstrap failure events + consumer step seam). Two deliberate behavior changes are called out under *Changed*.
+
+### Added
+- **Bootstrap failure seam.** A critical step failure/timeout now publishes `BootstrapFailed { StepName, Error, Attempt }` on `IEventBus` and surfaces as `BootstrapStepFailedException` (inner = original failure). `GameLauncher` subscribes to `BootstrapRetryRequested` and re-runs the pipeline, so a consumer loading screen can own retry UX — previously the launcher logged and the player hung on a dead splash forever. Steps must be idempotent across re-runs (new PITFALLS entry).
+- **Consumer bootstrap-step seam.** Register `BootstrapStepRegistration` (`Append`/`Before`/`After`/`Replace` + anchor step name) from your own `OnRootContainerBuilding` installer; the pipeline factory composes registrations onto the 16 defaults in registration order (`BootstrapStepComposer`). Typo'd anchor names throw at boot instead of silently skipping. Reflex's `All<T>()` registration-order behavior is pinned by a dedicated test.
+- `link.xml` template in `Samples~/BootstrapScene` — IL2CPP strips save-model types deserialized through Newtonsoft reflection; fails on device only.
+- PITFALLS entries: swap-real-SDK criticality/timeout review, bootstrap step idempotency, cross-assembly `partial` invalidity, IL2CPP save-model stripping. Plus a per-step criticality/timeout defaults table in `docs/architecture/bootstrap-pipeline.md`.
+
+### Changed
+- **`CrashlyticsStep`: `IsCritical` → `false`, `Timeout` → 5s** (was critical + 30s default). Ordering ≠ criticality — the step stays first so later failures get reported, but a crash-reporter outage can no longer block app launch (aborting produces zero reports anyway). Invisible with the shipped mock; semantic once a real SDK is swapped in — flipping pre-1.0 is the cheapest this will ever be.
+- **`ProjectScopeInstaller.Hook` moved to `BeforeSplashScreen`** (was `BeforeSceneLoad`) so template bindings always register before consumer installers. Consumer re-registration of a contract (last-write-wins) is now deterministic instead of depending on Unity's unspecified cross-assembly `RuntimeInitializeOnLoadMethod` ordering.
+- **Extension story corrected everywhere.** "Extend `ProjectScopeInstaller` via a `UserServices.cs` partial" is invalid C# for UPM consumers — partials cannot span assemblies. Both CLAUDE.md files, `extension-points.md`, and the installer's own comments now teach the real seams: `OnRootContainerBuilding` (bindings) + `BootstrapStepRegistration` (steps); the partial remains documented as fork-mode-only. `extension-points.md` recipes also fixed against the actual interfaces: nonexistent `ISaveService.Get<T>(key, default)` (×3), wrong `ICrashlyticsService` members, false "auto-saves on app pause" claim, subclass-the-sealed-class `Migrate` advice, and `[DefaultExecutionOrder]` ordering advice that has no effect on load methods.
+- `docs/services/save.md` gains the corrupt-quarantine and **mobile `OnApplicationPause(true) → SaveAsync` recipe (required for production mobile)**; `docs/security/save-encryption.md` gains the IL2CPP stripping practice.
+
+### Fixed
+- **Save data-loss paths.** Corrupt/tampered save files are quarantined to `save.dat.corrupt` before reset-to-empty (recovery/forensics seam — previously the next save overwrote the only copy). `Dispose()` now synchronously flushes a `RequestSave` still inside the 1s debounce window (previously cancelled and silently dropped); flush uses a dedicated sync write core because blocking on `SaveAsync` would deadlock on its main-thread continuation.
+- **Popup bookkeeping mis-pop.** A cancelled `PushAsync` blindly popped whichever popup was on top of `_activePopups` — with interleaved pushes, cancelling the first evicted the second's entry and the next `PopAsync` closed (and published `PopupClosed` for) the wrong popup. Same-shape sweep fixed the identical pattern in `PopupStack` (sort-order entries) and the close path. Both structures now remove by reference; routine `OperationCanceledException` paths no longer log an error.
+- Boundary guards per the validate-at-boundaries principle: `LogService.Error(null)` no-ops safely (context still logged), empty-text toasts are ignored with a warning, zero/negative toast durations clamp to 0.5s.
+
+### Tests
+- EditMode suite 82 → 101 methods. New: bootstrap failure event/exception contract (×3), Crashlytics non-criticality (×2), save quarantine + dispose flush (×2), log/toast guards (×4), step composer anchors (×6), Reflex registration-order pin, popup interleaved push/cancel. The two pre-existing critical-abort tests now assert the wrapped `BootstrapStepFailedException` per the Phase 6 spec (recorded in JOURNAL).
+
 ## [0.3.0] — 2026-05-31 — AI agent harness guardrails
 
 ### Added
