@@ -332,7 +332,9 @@ Release entry. Closes out the deferred bumps from the two `[Unreleased]` entries
 
 ---
 
-## Phase 6 — 2026-06-11 (branch `phase-6-hardening`, implemented — **awaiting Editor verification before merge**) — v0.4.0
+## Phase 6 — 2026-06-11 (branch `phase-6-hardening`, merged to `main`) — v0.4.0
+
+> Editor verification confirmed by user 2026-06-12: Play `Bootstrap.unity` all 16 steps complete, Test Runner all green (101 EditMode). Phase-close audit: MERGE-READY (6/6 PASS).
 
 Production hardening from the v0.3.0 full review (3 Explore agents + line-level manual verification + Plan-agent design review). Runtime: bootstrap failure seam, Crashlytics criticality default, save corruption quarantine + dispose flush, popup bookkeeping fix, consumer bootstrap-step seam, boundary guards. Docs: extension-story overhaul — the documented `ProjectScopeInstaller.UserServices.cs` partial seam is invalid C# across assemblies (partials cannot span assemblies; UPM consumers cannot use it, forks are deny-ruled), replaced by `ContainerScope.OnRootContainerBuilding` + step-registration recipes — plus IL2CPP/AOT `link.xml` guidance.
 
