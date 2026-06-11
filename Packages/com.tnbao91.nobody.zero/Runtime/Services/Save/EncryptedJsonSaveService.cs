@@ -37,6 +37,11 @@ namespace Zero.Services.Save
         private CancellationTokenSource _debounceCts;
         private bool _disposed;
 
+        // True while a RequestSave has not yet been persisted. Cleared at snapshot
+        // time (a racing RequestSave re-sets it), restored if the write fails.
+        // Dispose flushes synchronously when still dirty — see FlushPendingOnDispose.
+        private volatile bool _dirty;
+
         public Observable<Unit> OnLoaded => _onLoaded;
 
         public EncryptedJsonSaveService(ILogService log)
@@ -98,8 +103,10 @@ namespace Zero.Services.Save
                 }
                 catch (Exception ex)
                 {
+                    bool quarantined = TryQuarantineCorruptFile();
                     await UniTask.SwitchToMainThread();
                     _log.Error(ex, "[SAVE] Decryption failed; resetting to empty");
+                    LogQuarantineOutcome(quarantined);
                     lock (_dataLock) { _data = new JObject(); }
                     _onLoaded.OnNext(Unit.Default);
                     return;
@@ -112,8 +119,10 @@ namespace Zero.Services.Save
                 }
                 catch (Exception ex)
                 {
+                    bool quarantined = TryQuarantineCorruptFile();
                     await UniTask.SwitchToMainThread();
                     _log.Error(ex, "[SAVE] JSON parse failed; resetting to empty");
+                    LogQuarantineOutcome(quarantined);
                     lock (_dataLock) { _data = new JObject(); }
                     _onLoaded.OnNext(Unit.Default);
                     return;
@@ -143,30 +152,26 @@ namespace Zero.Services.Save
             try
             {
                 JObject snapshot;
-                lock (_dataLock) { snapshot = (JObject)_data.DeepClone(); }
-
-                var envelope = new JObject
+                lock (_dataLock)
                 {
-                    ["version"] = CurrentVersion,
-                    ["data"] = snapshot,
-                };
-                string json = envelope.ToString(Formatting.None);
+                    snapshot = (JObject)_data.DeepClone();
+                    _dirty = false;
+                }
 
                 await UniTask.SwitchToThreadPool();
-                byte[] cipher = Encrypt(json, _aesKey, _hmacKey);
-                string tmp = _filePath + ".tmp";
-                File.WriteAllBytes(tmp, cipher);
-                if (File.Exists(_filePath))
+                int byteCount;
+                try
                 {
-                    File.Replace(tmp, _filePath, null);
+                    byteCount = WriteEnvelopeBlocking(snapshot);
                 }
-                else
+                catch
                 {
-                    File.Move(tmp, _filePath);
+                    _dirty = true; // write failed — keep the dispose-flush safety net armed
+                    throw;
                 }
 
                 await UniTask.SwitchToMainThread();
-                _log.Info($"[SAVE] Persisted {snapshot.Count} keys ({cipher.Length} bytes)");
+                _log.Info($"[SAVE] Persisted {snapshot.Count} keys ({byteCount} bytes)");
             }
             finally
             {
@@ -174,9 +179,60 @@ namespace Zero.Services.Save
             }
         }
 
+        // Serialize + encrypt + atomic write. Shared by SaveAsync (on the thread
+        // pool) and FlushPendingOnDispose (synchronous, quit path). No Unity API.
+        private int WriteEnvelopeBlocking(JObject snapshot)
+        {
+            var envelope = new JObject
+            {
+                ["version"] = CurrentVersion,
+                ["data"] = snapshot,
+            };
+            string json = envelope.ToString(Formatting.None);
+            byte[] cipher = Encrypt(json, _aesKey, _hmacKey);
+            string tmp = _filePath + ".tmp";
+            File.WriteAllBytes(tmp, cipher);
+            if (File.Exists(_filePath))
+            {
+                File.Replace(tmp, _filePath, null);
+            }
+            else
+            {
+                File.Move(tmp, _filePath);
+            }
+            return cipher.Length;
+        }
+
+        // Preserve the unreadable file for forensics/recovery — without this, the
+        // next SaveAsync overwrites the only copy of whatever the player had.
+        // Runs on the thread pool (no logging here); never breaks reset-to-empty.
+        private bool TryQuarantineCorruptFile()
+        {
+            try
+            {
+                string corruptPath = _filePath + ".corrupt";
+                if (File.Exists(corruptPath)) File.Delete(corruptPath);
+                File.Move(_filePath, corruptPath);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void LogQuarantineOutcome(bool quarantined)
+        {
+            if (quarantined)
+                _log.Warn($"[SAVE] Corrupt file quarantined to {_filePath}.corrupt");
+            else
+                _log.Warn("[SAVE] Could not quarantine the corrupt file; it will be overwritten by the next save.");
+        }
+
         public void RequestSave()
         {
             if (_disposed) return;
+            _dirty = true;
             _debounceCts?.Cancel();
             _debounceCts?.Dispose();
             _debounceCts = new CancellationTokenSource();
@@ -250,8 +306,46 @@ namespace Zero.Services.Save
             _disposed = true;
             _debounceCts?.Cancel();
             _debounceCts?.Dispose();
+            FlushPendingOnDispose();
             _ioLock.Dispose();
             _onLoaded.Dispose();
+        }
+
+        // Quit-path safety net: cancelling the debounce above would silently drop a
+        // RequestSave made inside the 1s window. Synchronous on purpose — blocking
+        // on SaveAsync here would deadlock (its SwitchToMainThread continuation can
+        // never run while Dispose blocks the main thread). Wait(0): if another save
+        // holds the lock, its write is already in flight with a snapshot at least
+        // as fresh as the debounce; skip rather than wait on a dying player loop.
+        // Mobile gets killed without Dispose — the primary safety net is the
+        // OnApplicationPause(true) → SaveAsync recipe in docs/services/save.md.
+        private void FlushPendingOnDispose()
+        {
+            if (!_dirty) return;
+            if (!_ioLock.Wait(0))
+            {
+                _log.Warn("[SAVE] Dispose with a pending save while another save is in flight; skipping flush.");
+                return;
+            }
+            try
+            {
+                JObject snapshot;
+                lock (_dataLock)
+                {
+                    snapshot = (JObject)_data.DeepClone();
+                    _dirty = false;
+                }
+                int byteCount = WriteEnvelopeBlocking(snapshot);
+                _log.Info($"[SAVE] Flushed pending save on dispose ({snapshot.Count} keys, {byteCount} bytes)");
+            }
+            catch (Exception ex)
+            {
+                _log.Error(ex, "[SAVE] Dispose flush failed");
+            }
+            finally
+            {
+                _ioLock.Release();
+            }
         }
 
         private static JObject Migrate(JObject data, int from, int to)
