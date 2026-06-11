@@ -44,7 +44,7 @@ private static JObject Migrate(JObject data, int from, int to)
 }
 ```
 
-If your game needs migration coverage in tests (write a v0 envelope, assert callback fires) consider promoting `Migrate` to `protected virtual` and unsealing the class — that's a deliberate v1 limitation, not an accidental one. See "Known Limitations" below.
+If your game needs migration coverage in tests (write a v0 envelope, assert the hook fires), the template-side refactor is an injected `ISaveMigrator` seam — not subclassing; the class stays `sealed`. That's a deliberate v1 limitation, not an accidental one. See "Known Limitations" below.
 
 **Reset-on-decrypt-fail (with quarantine).** Decryption failure (HMAC mismatch, corrupt ciphertext) does NOT throw. The service first moves the unreadable file to `save.dat.corrupt` (overwriting any previous quarantine), then logs and resets the in-memory `_data` to empty so the next launch gets a fresh save. The quarantined file is the recovery/forensics seam: a support flow can upload it, a patched build can re-attempt decryption, or QA can diff it. For games where progress is monetised, replace `EncryptedJsonSaveService` entirely with an impl that fails loudly and blocks launch until a server-side recovery flow runs — `ISaveService` lives in `Zero.Core` precisely so consumers can swap impls without touching call sites.
 
