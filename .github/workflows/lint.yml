@@ -16,3 +16,15 @@ jobs:
         with:
           python-version: '3.12'
       - uses: pre-commit/action@v3.0.1
+
+  # The maintainer-side AI harness has a game-tuned consumer mirror in the
+  # ClaudeMemory sample. PR-only: needs a base ref to diff against.
+  claude-mirror:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Consumer-mirror drift guard
+        run: bash .github/scripts/check-claude-mirror.sh "origin/${{ github.base_ref }}"

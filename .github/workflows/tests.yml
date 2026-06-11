@@ -21,6 +21,18 @@ jobs:
         with:
           lfs: true
 
+      # Fail fast if the pinned unityVersion drifts from the project — game-ci
+      # would otherwise license-activate and run against the wrong editor.
+      - name: Verify pinned Unity version matches ProjectVersion.txt
+        run: |
+          project="$(grep -m1 '^m_EditorVersion:' ProjectSettings/ProjectVersion.txt | awk '{print $2}')"
+          pinned="$(grep -m1 '^ *unityVersion:' .github/workflows/tests.yml | awk '{print $2}')"
+          if [ "$project" != "$pinned" ]; then
+            echo "::error file=.github/workflows/tests.yml::unityVersion '$pinned' != ProjectVersion.txt '$project' — update the pin"
+            exit 1
+          fi
+          echo "Unity version pin OK: $pinned"
+
       # Cache Library/ keyed on the inputs that drive its content. Library/
       # itself is gitignored, so hashing it would produce a constant key and
       # the cache would never invalidate.
