@@ -19,6 +19,7 @@ namespace Zero.UI
     {
         private const int MaxQueued = 16;
         private const string ToastPrefabKey = "ui/toast/default";
+        internal const float MinDurationSeconds = 0.5f;
 
         private readonly IAssetService _assetService;
         private readonly Transform _toastLayer;
@@ -54,8 +55,21 @@ namespace Zero.UI
             }
         }
 
+        // A zero/negative duration would flash the toast for a single frame —
+        // always a caller bug, so fail safe by clamping instead of throwing.
+        internal static float ClampDuration(float durationSeconds)
+            => durationSeconds < MinDurationSeconds ? MinDurationSeconds : durationSeconds;
+
         public void Show(string text, float durationSeconds = 2f)
         {
+            if (_disposed) return;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                Debug.LogWarning("[UI] Toast with empty text ignored.");
+                return;
+            }
+            durationSeconds = ClampDuration(durationSeconds);
+
             if (_queue.Count >= MaxQueued)
             {
                 Debug.LogWarning($"[UI] Toast queue at max capacity ({MaxQueued}). Dropping oldest message.");

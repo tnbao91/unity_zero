@@ -33,7 +33,12 @@ namespace Zero.Services.Log
             {
                 Debug.LogError(context);
             }
-            Debug.LogException(exception);
+            // Boundary guard: the logging path itself must never throw or forward
+            // a null into Debug.LogException. Context (if any) was still logged.
+            if (exception != null)
+            {
+                Debug.LogException(exception);
+            }
         }
     }
 }

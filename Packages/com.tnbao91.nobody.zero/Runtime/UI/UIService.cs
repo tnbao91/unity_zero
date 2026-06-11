@@ -305,6 +305,11 @@ namespace Zero.UI
         public void ShowToast(string text, float duration = 2f)
         {
             if (_disposed) return;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                _logService.Warn("[UI] ShowToast called with empty text. Ignored.");
+                return;
+            }
             if (!_rootAttached)
             {
                 _logService.Warn("[UI] ShowToast called with no UIRoot attached. Message dropped: " + text);
