@@ -10,9 +10,14 @@ Almost every third-party SDK service is a mock. Swap by writing a real impl + ov
 // Assets/_Game/Services/FirebaseCrashlyticsService.cs (YOUR game)
 public sealed class FirebaseCrashlyticsService : ICrashlyticsService
 {
-    public void LogException(Exception ex) => Firebase.Crashlytics.Crashlytics.LogException(ex);
-    public void SetUserId(string id) => Firebase.Crashlytics.Crashlytics.SetUserId(id);
+    public async UniTask InitializeAsync(CancellationToken ct = default)
+        => await Firebase.FirebaseApp.CheckAndFixDependenciesAsync()
+            .AsUniTask().AttachExternalCancellation(ct);
+
+    public void RecordException(Exception ex) => Firebase.Crashlytics.Crashlytics.LogException(ex);
+    public void Log(string message) => Firebase.Crashlytics.Crashlytics.Log(message);
     public void SetCustomKey(string key, string value) => Firebase.Crashlytics.Crashlytics.SetCustomKey(key, value);
+    public void SetUserId(string id) => Firebase.Crashlytics.Crashlytics.SetUserId(id);
 }
 
 // Assets/_Game/Bootstrap/MyGameOverridesInstaller.cs
@@ -33,6 +38,8 @@ public static class MyGameOverridesInstaller
     }
 }
 ```
+
+After swapping a real SDK in, re-review that step's `IsCritical`/`Timeout` — mocks are instant, real vendors hang (see upstream PITFALLS "Swapping a real SDK into a bootstrap step").
 
 Recipes per SDK at upstream `docs/services/<sdk>.md`:
 - `crashlytics.md` — Firebase Crashlytics / Sentry
@@ -117,7 +124,7 @@ public sealed class AddCoinsCommand : IConsoleCommand
     public string Execute(string[] args)
     {
         if (!int.TryParse(args[0], out var amount)) return "usage: coins add <int>";
-        var current = _save.Get<int>("game.coins", 0);
+        _save.TryGet("game.coins", out int current); // false → current stays 0
         _save.Set("game.coins", current + amount);
         return $"+{amount} coins (now {current + amount})";
     }
@@ -139,7 +146,7 @@ public sealed class MyGameDataStep : BootstrapStepBase
     private readonly IAssetService _assets;
     public MyGameDataStep(IAssetService assets) { _assets = assets; }
 
-    protected override async UniTask ExecuteAsync(IProgress<float> progress, CancellationToken ct)
+    protected override async UniTask OnExecuteAsync(IProgress<float> progress, CancellationToken ct)
     {
         progress?.Report(0.5f);
         await _assets.LoadAsync<GameDataAsset>("game/data/main", ct);
@@ -148,12 +155,19 @@ public sealed class MyGameDataStep : BootstrapStepBase
 }
 ```
 
-Wire via partial extension OR your own installer:
+Wire by registering a `BootstrapStepRegistration` in your installer (same `OnRootContainerBuilding` hook as recipe 7). Anchors: `Append` (default), or `Before`/`After`/`Replace` + an existing step's `Name` — the default-step table lives in upstream `docs/architecture/bootstrap-pipeline.md`:
 
 ```csharp
-// Override the steps list — add yours after Zero's
-// Cleanest: extend ProjectScopeInstaller via partial class file in YOUR asmdef
+// Inside your Install(ContainerBuilder builder):
+builder.RegisterFactory(
+    c => new BootstrapStepRegistration(
+        new MyGameDataStep(c.Resolve<IAssetService>()),
+        BootstrapStepAnchor.After, "Save"),
+    new[] { typeof(BootstrapStepRegistration) },
+    Lifetime.Singleton, Resolution.Lazy);
 ```
+
+Do NOT try to extend `ProjectScopeInstaller` with a partial class — C# partials cannot span assemblies, so that path only exists for template forks, never for UPM consumers. A typo'd anchor name throws at boot instead of silently skipping your step. Re-runs (`BootstrapRetryRequested` after a `BootstrapFailed`) execute every step again — keep steps idempotent.
 
 ## 6. Persist game state
 
@@ -162,8 +176,17 @@ Always use `ISaveService`. Keys are strings — namespace them:
 ```csharp
 _save.Set("game.match3.level", 5);
 _save.Set("game.match3.coins", 1234);
-var unlocked = _save.Get<bool>("game.tutorial.completed", false);
-await _save.SaveAsync(); // explicit flush; auto-saves on app pause
+_save.TryGet("game.tutorial.completed", out bool unlocked); // false when absent
+await _save.SaveAsync(); // explicit flush
+```
+
+There is **no automatic pause save** — wire it yourself, it is required on mobile (suspended apps get killed with no callback):
+
+```csharp
+private void OnApplicationPause(bool pauseStatus)
+{
+    if (pauseStatus) _save.SaveAsync().Forget();
+}
 ```
 
 For schema migration, define keys in YOUR data classes and version them:
@@ -177,7 +200,7 @@ public sealed class GameSaveData
 // Old v1 had `int LevelsCompleted` (count); v2 splits into list — write Migrate
 ```
 
-`EncryptedJsonSaveService.Migrate(JObject root, int from, int to)` is virtual; override in YOUR `<Game>SaveService : EncryptedJsonSaveService` if you need it. But re-binding the save service is rare — most games just version individual keys.
+`EncryptedJsonSaveService` is `sealed` and its `Migrate` hook is `private static` — you cannot subclass it. Version individual keys in your own data classes (as above), or swap the whole `ISaveService` binding for your own impl (recipe 1 pattern) when you need real envelope migrations. Corrupt saves are quarantined to `save.dat.corrupt` before reset; recovery/forensics details in upstream `docs/services/save.md`.
 
 ## 7. Add a custom service (per-game)
 
@@ -212,7 +235,7 @@ public static class MyGameInstaller
 }
 ```
 
-The hook runs after Zero's installers (assuming your game's `BeforeSceneLoad` registers later in the call order). For deterministic ordering, override `[DefaultExecutionOrder]` or use a single combined installer.
+Ordering is guaranteed by load type, not luck: Zero subscribes at `BeforeSplashScreen`, your `BeforeSceneLoad` hook always runs after it, so your registrations land **last** — and Reflex resolves the last registration per contract. That is exactly what makes the recipe-1 mock-override deterministic. (`[DefaultExecutionOrder]` has no effect here — it orders MonoBehaviour callbacks, not `RuntimeInitializeOnLoadMethod`.)
 
 ## 8. Subscribe to lifecycle events (decoupled)
 
@@ -230,7 +253,8 @@ void OnDestroy() => _sub?.Dispose();
 private void OnLevelCompleted(LevelCompleted evt)
 {
     var coins = evt.Stars * 50;
-    _save.Set("game.coins", _save.Get<int>("game.coins", 0) + coins);
+    _save.TryGet("game.coins", out int current);
+    _save.Set("game.coins", current + coins);
     _bus.Publish(new CurrencyChanged(currency: "coins", delta: coins));
 }
 ```

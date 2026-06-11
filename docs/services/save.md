@@ -46,7 +46,7 @@ private static JObject Migrate(JObject data, int from, int to)
 
 If your game needs migration coverage in tests (write a v0 envelope, assert callback fires) consider promoting `Migrate` to `protected virtual` and unsealing the class — that's a deliberate v1 limitation, not an accidental one. See "Known Limitations" below.
 
-**Reset-on-decrypt-fail.** Decryption failure (HMAC mismatch, corrupt ciphertext) does NOT throw. The service logs and resets the in-memory `_data` to empty so the next launch gets a fresh save. For games where progress is monetised, replace `EncryptedJsonSaveService` entirely with an impl that fails loudly and blocks launch until a server-side recovery flow runs — `ISaveService` lives in `Zero.Core` precisely so consumers can swap impls without touching call sites.
+**Reset-on-decrypt-fail (with quarantine).** Decryption failure (HMAC mismatch, corrupt ciphertext) does NOT throw. The service first moves the unreadable file to `save.dat.corrupt` (overwriting any previous quarantine), then logs and resets the in-memory `_data` to empty so the next launch gets a fresh save. The quarantined file is the recovery/forensics seam: a support flow can upload it, a patched build can re-attempt decryption, or QA can diff it. For games where progress is monetised, replace `EncryptedJsonSaveService` entirely with an impl that fails loudly and blocks launch until a server-side recovery flow runs — `ISaveService` lives in `Zero.Core` precisely so consumers can swap impls without touching call sites.
 
 ## Examples
 
@@ -94,12 +94,30 @@ _save.OnLoaded.Subscribe(_ =>
 });
 ```
 
+**Mobile lifecycle flush (REQUIRED for production mobile):**
+```csharp
+// Attach to any long-lived MonoBehaviour in your game.
+// On iOS/Android the OS pauses then KILLS the app — Dispose() may never run.
+// SaveAsync bypasses the debounce, so this persists everything immediately.
+private void OnApplicationPause(bool pauseStatus)
+{
+    if (pauseStatus)
+    {
+        _save.SaveAsync().Forget();
+    }
+}
+```
+
+`Dispose()` is the desktop/editor safety net: if a `RequestSave` is still inside the 1s debounce window when the service is disposed (app quit), it flushes synchronously before releasing resources. The pause hook above remains the primary mechanism on mobile, because suspended apps are killed without any C# callback.
+
 ## Known Limitations
 
 - **Single-slot only:** the template saves to one file. Multi-profile save systems must be consumer-built on top of `ISaveService` (e.g., enumerate multiple files).
 - **Client-side crypto:** HMAC protects against casual tampering (modifying values in a hex editor). It does NOT protect against reverse-engineering the secret or replaying old saves. If progress or currency is tied to real-world money, **you must validate on the backend** (server-of-truth).
 - **No compression:** JSON is stored plaintext → ciphertext, uncompressed. Large save files (>1MB) will be slow to encrypt; consider archiving non-essential data.
 - **Synchronous access:** `TryGet` / `Set` / `Delete` are synchronous; they lock a mutex internally. For very frequent updates (10000+/frame), batch writes in a temporary dict and call `Set` once per frame instead.
+- **Quarantine is single-slot:** only the most recent corrupt file is kept (`save.dat.corrupt` is overwritten by a newer corruption). A support/recovery flow that needs history must copy it elsewhere.
+- **Dispose flush is best-effort:** if an explicit `SaveAsync` is mid-flight when `Dispose()` runs, the flush is skipped (that save already carries a snapshot at least as fresh as the debounce). On mobile, rely on the `OnApplicationPause` recipe above, not on `Dispose()`.
 - **Migration testing.** v1's `Migrate` is `private static` and the class is `sealed`, so the EditMode test suite cannot write a synthetic v0 file and assert the callback fires end-to-end. The shipped tests cover round-trip and tamper-reset only. Promoting `Migrate` to `protected virtual` (or refactoring it behind an injected `ISaveMigrator` interface) is a candidate refactor when a real game adds its first migration.
 
 ## Design Rationale

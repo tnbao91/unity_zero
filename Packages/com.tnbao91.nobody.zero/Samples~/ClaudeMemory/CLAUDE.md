@@ -19,7 +19,7 @@ If you find yourself wanting to edit a file inside `Packages/com.tnbao91.nobody.
 ## Core principles
 
 - **Peer rule.** `Zero.Gameplay`, `Zero.Meta`, `Zero.UI` (and your equivalents in YOUR game asmdef) never reference each other. Cross-tier coupling goes through `IEventBus` (impl `R3EventBus`).
-- **DI via Reflex.** Resolve services via `[Inject]` or `Container.RootContainer`. Never `new` a service that has an interface — always inject. Custom per-game services go in your own installer (extend `ProjectScopeInstaller` via partial `ProjectScopeInstaller.UserServices.cs`, or register at scene scope).
+- **DI via Reflex.** Resolve services via `[Inject]` or `Container.RootContainer`. Never `new` a service that has an interface — always inject. Custom per-game services go in YOUR own installer: subscribe `ContainerScope.OnRootContainerBuilding` from your asmdef (recipe in `claude-context/extension-points.md` §7), or register at scene scope. Do NOT try a `ProjectScopeInstaller` partial — C# partials cannot span assemblies, so that path does not exist for UPM consumers.
 - **Sealed services + interface seams.** Every Zero service impl is `sealed`. Extend by replacing the binding (in your installer) or by wrapping in a decorator — never "subclass and override".
 - **Mock-first SDK swap.** Real SDK adapter is a one-line installer swap in YOUR game's installer. Don't fork the package to inject a real Crashlytics / Ads / IAP impl.
 - **Test behavior, not snapshots.** A test that asserts consumer-facing behavior (state machine transition order, save round-trip, gesture detection at documented thresholds) earns its weight. Snapshot-style tests that instantiate-and-null-check do not.

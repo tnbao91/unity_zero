@@ -32,8 +32,11 @@ using Resolution = Reflex.Enums.Resolution;
 
 namespace Zero.Bootstrap
 {
-    // Marked partial so consumers can add their own services in
-    // ProjectScopeInstaller.UserServices.cs without forking the template.
+    // Marked partial for the template-CLONE workflow only: a fork can drop a
+    // ProjectScopeInstaller.UserServices.cs next to this file. UPM consumers
+    // CANNOT use it (C# partials never span assemblies) — their seams are their
+    // own ContainerScope.OnRootContainerBuilding installer (bindings; last
+    // registration wins) and BootstrapStepRegistration (pipeline steps).
     public static partial class ProjectScopeInstaller
     {
         // BeforeSplashScreen, not BeforeSceneLoad: Reflex resets the delegate at
@@ -85,7 +88,8 @@ namespace Zero.Bootstrap
                 Lifetime.Singleton,
                 Resolution.Lazy);
 
-            // Hook for consumer extensions — see ProjectScopeInstaller.UserServices.cs.
+            // Fork-mode hook only (see the partial note on the class). UPM
+            // consumers extend via their own OnRootContainerBuilding installer.
             InstallUserBindings(builder);
 
             // Pipeline factory — explicit step list keeps ordering deterministic.
@@ -149,8 +153,9 @@ namespace Zero.Bootstrap
             }, Lifetime.Singleton, Resolution.Lazy);
         }
 
-        // Defined as `partial` so consumers can add additional bindings without
-        // editing this file. See ProjectScopeInstaller.UserServices.cs in their fork.
+        // Fork-mode seam: implementable only from inside this assembly (C#
+        // partials cannot span assemblies). With no implementation the compiler
+        // erases the call. UPM consumers: use OnRootContainerBuilding instead.
         static partial void InstallUserBindings(ContainerBuilder builder);
     }
 }

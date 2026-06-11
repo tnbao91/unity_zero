@@ -1,0 +1,30 @@
+<!--
+  IL2CPP managed-stripping guard for save-persisted types.
+
+  EncryptedJsonSaveService round-trips your types through Newtonsoft's
+  token.ToObject<T>() — pure reflection. The IL2CPP stripper cannot see that
+  usage, so on Medium/High stripping your save-model types (or their
+  parameterless ctors and setters) get stripped and deserialization fails at
+  runtime ON DEVICE only. Editor and Mono builds hide the problem.
+
+  Setup: this file is imported next to Bootstrap.unity when you import the
+  sample — keep it anywhere under Assets/. Add one <type> entry per type you
+  pass to ISaveService.Set<T>/TryGet<T>, or preserve the whole namespace/
+  assembly that holds your save models. R3, UniTask and Newtonsoft ship their
+  own preservation hints; only YOUR types need entries here.
+
+  See docs/dev/PITFALLS.md → "IL2CPP strips save-model types".
+-->
+<linker>
+  <!-- Example: preserve every type in your save-model namespace.
+  <assembly fullname="YourGame.Runtime">
+    <type fullname="YourGame.SaveModels.*" preserve="all" />
+  </assembly>
+  -->
+
+  <!-- Example: preserve a single type.
+  <assembly fullname="YourGame.Runtime">
+    <type fullname="YourGame.SaveModels.PlayerProfile" preserve="all" />
+  </assembly>
+  -->
+</linker>

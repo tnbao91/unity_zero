@@ -214,15 +214,23 @@ Singletons with `Resolution.Lazy` may not be constructed yet when the first Mono
 
 `BootstrapStepBase` provides `Name`, `IsCritical`, `Timeout` (default 30s), `MaxRetries` (default 1). The pipeline:
 
-- Runs steps sequentially in the order declared in `ProjectScopeInstaller.InstallBindings`.
+- Runs steps sequentially in the order declared in `ProjectScopeInstaller.InstallBindings` (consumers extend the list by registering `BootstrapStepRegistration` from their own installer — see `docs/architecture/bootstrap-pipeline.md`).
 - Wraps each step in a linked CTS that fires `CancelAfter(step.Timeout)`.
 - Retries non-critical failures up to `MaxRetries` times, then logs and continues.
-- Aborts on critical failure or outer-token cancellation.
+- Aborts on critical failure or timeout: publishes `BootstrapFailed {StepName, Error, Attempt}` on `IEventBus`, then throws `BootstrapStepFailedException` (inner = original failure). Outer-token cancellation propagates raw — it is a system signal, not a failure.
 - Forwards per-step progress through `IBootstrapProgressReporter` (Singleton in `Zero.Infrastructure`).
 
-When adding a step: extend `BootstrapStepBase`, override `Name`, set `IsCritical` only when the app cannot launch without it (currently only `CrashlyticsStep` is critical), and override `Timeout` for network-bound steps.
+When adding a step: extend `BootstrapStepBase`, override `Name`, set `IsCritical` only when the app cannot launch without it (currently `AssetStep`, `ConsentStep`, `DeviceProfileStep`), and override `Timeout` for network-bound steps.
 
-### Defensive guards in template-default services
+**Steps must be idempotent.** `BootstrapRetryRequested` re-runs the *whole* pipeline — there is no completed-step tracking, so steps that already succeeded run again. Guard one-time side effects inside the service (`if (_initialized) return;`), not in the step; a step that double-subscribes events or re-schedules notifications on the second pass corrupts state precisely in the failure-recovery path where users are already annoyed.
+
+### Swapping a real SDK into a bootstrap step — re-review `IsCritical` + `Timeout`
+
+The mock services return instantly, so the shipped criticality/timeout defaults have **never been exercised against real network behavior**. The trap fires months later: swap real Firebase into `ICrashlyticsService`, vendor has an outage, and a step that was invisible with mocks now consumes its full timeout on the splash screen — or, if critical, aborts launch entirely. `IsCritical` answers "is the app unusable if this never initializes?", not "is this important" (ordering is the separate decision: Crashlytics runs *first* but is non-critical — aborting launch produces zero crash reports anyway). When you swap any real SDK in: re-read that step's `IsCritical`, set a `Timeout` matched to the vendor's real p99 init time, and verify the failure path by initializing in airplane mode. Defaults table: `docs/architecture/bootstrap-pipeline.md` → "Step defaults".
+
+### `partial` classes cannot span assemblies — package partial hooks are fork-only
+
+C# requires all parts of a `partial` type to compile into the **same assembly**. A `static partial void InstallUserBindings(...)` hook inside the package can only be implemented by adding a file *inside the package folder* — which UPM consumers cannot do (read-only cache, deny-ruled, overwritten on update). Any doc that tells a consumer to "extend `ProjectScopeInstaller` via a partial class in your asmdef" describes something the compiler rejects. The real consumer seams are: `ContainerScope.OnRootContainerBuilding += yourInstaller` (bindings; last registration wins) and `BootstrapStepRegistration` (pipeline steps). The partial hook remains valid for the template-clone/fork workflow only — say which mode a recipe targets.
 
 The template ships with empty defaults for many third-party integrations. Any service that wraps a Unity package with required setup (Localization tables, Mobile Notifications channels, etc.) must short-circuit with a warning when the setup is missing — otherwise a fresh clone won't run.
 
@@ -240,7 +248,7 @@ Don't add a `HasKeyAsync` round-trip in front of a `LoadAsync` that must throw o
 ### Sealed services + interface seams
 
 Most service implementations are `sealed`. Extension is via:
-1. Replacing the binding in `<Service>ServiceInstaller.Install(...)` (or in a consumer's `<Game>ScopeInstaller.UserServices.cs` partial).
+1. Replacing the binding — maintainer-side in `<Service>ServiceInstaller.Install(...)`, consumer-side by re-registering the contract in your own `ContainerScope.OnRootContainerBuilding` installer (last registration wins; see the `partial`-classes pitfall above for why the old "UserServices partial" advice was wrong for UPM consumers).
 2. Wrapping the existing impl in a decorator and binding the decorator instead.
 
 Documentation should never say "subclass and override" for a `sealed` class — that's an immediate red flag during review.
@@ -348,6 +356,10 @@ If you need dispatch based on a type you can't express in a generic signature, u
 3. Call the interface method directly on the stack variable.
 
 See `Packages/com.tnbao91.nobody.zero/Runtime/UI/PopupHandle.cs` and `UIService.PopAsync()`.
+
+### IL2CPP strips save-model types — ship a `link.xml`
+
+`EncryptedJsonSaveService` round-trips consumer types through Newtonsoft's `token.ToObject<T>()` — pure reflection. The IL2CPP managed stripper cannot see that usage, so under Medium/High stripping the save-model types (or just their parameterless ctors and property setters) are removed and deserialization fails **on device only** — Editor and Mono builds hide it completely. Every type passed to `ISaveService.Set<T>`/`TryGet<T>` (beyond primitives/arrays of primitives) needs a `link.xml` entry, or preserve the whole save-model namespace. A commented template ships in `Samples~/BootstrapScene/link.xml`; the same applies to any other reflection-deserialized payloads (remote-config POCOs when a real impl is swapped in). Verify with an actual IL2CPP device build before shipping — there is no Editor-side check.
 
 ### Override-sorting child Canvas needs its own GraphicRaycaster
 
