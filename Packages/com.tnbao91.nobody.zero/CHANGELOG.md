@@ -4,6 +4,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; per-ph
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-06-11 — Production hardening
+
+Mostly drop-in; read the three action items. Additive public API (minor bump): `BootstrapFailed` / `BootstrapRetryRequested` events, `BootstrapStepFailedException`, `BootstrapStepRegistration` + `BootstrapStepComposer`.
+
+**Action required for production games:**
+1. **Mobile save flush:** call `_save.SaveAsync().Forget()` from `OnApplicationPause(true)` — suspended apps are killed without callbacks and there is **no automatic pause save** (recipe in `docs/services/save.md`). `Dispose()` now flushes a pending debounced save, but that only covers desktop/editor quits.
+2. **IL2CPP `link.xml`:** types you persist via `ISaveService` are deserialized through reflection and get stripped on device builds. Import the updated `BootstrapScene` sample for the `link.xml` template.
+3. **If you swapped a real crash SDK in:** `CrashlyticsStep` is now non-critical with a 5s timeout (was critical/30s) so a vendor outage can't block launch. Need the old behavior? Re-register the step via `BootstrapStepRegistration(..., BootstrapStepAnchor.Replace, "Crashlytics")` with your own criticality.
+
+### Added
+- **Bootstrap failure/retry seam:** critical aborts publish `BootstrapFailed {StepName, Error, Attempt}` on `IEventBus` and throw `BootstrapStepFailedException`; publish `BootstrapRetryRequested` to make `GameLauncher` re-run the pipeline. Wire a retry button into your loading screen — steps re-run from the top, keep them idempotent.
+- **Bootstrap-step seam:** add/insert/replace pipeline steps from YOUR asmdef by registering `BootstrapStepRegistration` in your `OnRootContainerBuilding` installer — no fork, no partial. Recipe: `ClaudeMemory` sample → `extension-points.md` §5.
+- `Samples~/BootstrapScene/link.xml` template for save-model stripping.
+
+### Changed
+- `ProjectScopeInstaller.Hook` now registers at `BeforeSplashScreen`, making your installer's re-registrations (last-write-wins) deterministic — previously cross-assembly ordering was unspecified.
+- `CrashlyticsStep` non-critical + 5s timeout (see action item 3).
+- **`ClaudeMemory` sample corrected — re-import it.** The "extend `ProjectScopeInstaller` via `UserServices.cs` partial" advice was invalid C# for package consumers (partials can't span assemblies); recipes now use `OnRootContainerBuilding` + `BootstrapStepRegistration`. Sample code also fixed against the real interfaces (`ISaveService.TryGet` instead of a nonexistent `Get<T>(key, default)`, real `ICrashlyticsService` members, no pause auto-save claim, no subclassing the sealed save service).
+
+### Fixed
+- Corrupt/tampered saves are quarantined to `save.dat.corrupt` before reset-to-empty — your support flow finally has a recovery artifact.
+- `Dispose()` flushes a `RequestSave` still inside the 1s debounce window (desktop/editor quit path).
+- Cancelling a popup push while another popup was open could evict the wrong popup's bookkeeping and close the wrong popup on the next `PopAsync` — fixed by remove-by-reference in `UIService` and `PopupStack`.
+- `LogService.Error(null)` no longer forwards null into `Debug.LogException`; empty-text toasts ignored with a warning; toast durations clamp to ≥0.5s.
+
 ## [0.3.0] — 2026-05-31 — AI agent harness guardrails
 
 Safe drop-in upgrade — no runtime/service behavior change. The consumer-facing delta is in the `ClaudeMemory` sample.

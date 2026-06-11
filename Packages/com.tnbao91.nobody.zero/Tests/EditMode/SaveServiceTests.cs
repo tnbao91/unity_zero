@@ -32,6 +32,8 @@ namespace Zero.Tests.EditMode
             if (File.Exists(_saveFile)) File.Delete(_saveFile);
             string tmp = _saveFile + ".tmp";
             if (File.Exists(tmp)) File.Delete(tmp);
+            string corrupt = _saveFile + ".corrupt";
+            if (File.Exists(corrupt)) File.Delete(corrupt);
         }
 
         [UnityTest]
@@ -81,6 +83,51 @@ namespace Zero.Tests.EditMode
             await reader.LoadAsync();
             Assert.IsFalse(reader.TryGet("treasure", out int _),
                 "HMAC mismatch should reset to empty; previously-set keys must be unreachable.");
+            reader.Dispose();
+        });
+
+        [UnityTest]
+        public IEnumerator CorruptFile_QuarantinedBeforeReset() => UniTask.ToCoroutine(async () =>
+        {
+            var writer = new EncryptedJsonSaveService(new StubLogService());
+            await writer.LoadAsync();
+            writer.Set("treasure", 9999);
+            await writer.SaveAsync();
+            writer.Dispose();
+
+            byte[] tampered = File.ReadAllBytes(_saveFile);
+            tampered[60] ^= 0xFF;
+            File.WriteAllBytes(_saveFile, tampered);
+
+            var reader = new EncryptedJsonSaveService(new StubLogService());
+            await reader.LoadAsync();
+
+            string corrupt = _saveFile + ".corrupt";
+            Assert.IsTrue(File.Exists(corrupt),
+                "Corrupt file must be quarantined for forensics/recovery, not left to be overwritten.");
+            Assert.AreEqual(tampered, File.ReadAllBytes(corrupt),
+                "Quarantined bytes must be the corrupt file, byte for byte.");
+            Assert.IsFalse(File.Exists(_saveFile),
+                "Original path must be clear after quarantine so the next save starts fresh.");
+            Assert.IsFalse(reader.TryGet("treasure", out int _),
+                "Reset-to-empty contract must still hold.");
+            reader.Dispose();
+        });
+
+        [UnityTest]
+        public IEnumerator DisposeWithPendingDebouncedSave_FlushesToDisk() => UniTask.ToCoroutine(async () =>
+        {
+            var writer = new EncryptedJsonSaveService(new StubLogService());
+            await writer.LoadAsync();
+            writer.Set("k", "v");
+            writer.RequestSave(); // 1s debounce pending
+            writer.Dispose();     // "quit" inside the window — must flush synchronously
+
+            var reader = new EncryptedJsonSaveService(new StubLogService());
+            await reader.LoadAsync();
+            Assert.IsTrue(reader.TryGet("k", out string v),
+                "A RequestSave inside the debounce window must survive Dispose.");
+            Assert.AreEqual("v", v);
             reader.Dispose();
         });
 

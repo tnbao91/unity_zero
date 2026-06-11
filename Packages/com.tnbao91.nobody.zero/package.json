@@ -1,6 +1,6 @@
 {
   "name": "com.tnbao91.nobody.zero",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "displayName": "Zero — Hybrid Casual Template",
   "description": "Opinionated Unity 6 LTS template for hybrid casual / puzzle games. Reflex DI, UniTask, R3, LitMotion. ~28 services with mock-first defaults; peer Gameplay/UI/Meta layers cross-talk via IEventBus.",
   "unity": "6000.3",

@@ -78,6 +78,8 @@ private static JObject Migrate(JObject data, int from, int to)
 3. **For multi-profile saves:** `EncryptedJsonSaveService` is `sealed` and writes a single `save.dat`. To support multiple slots, write a sibling impl of `ISaveService` (in `Zero.Services.Save` or your own asmdef) that owns multiple files keyed by slot id, then rebind `ISaveService` in `SaveServiceInstaller`.
 4. **For cloud save:** after saving locally, also send the encrypted bytes to a server. Don't decrypt on the client to re-transmit. Store encrypted blob server-side and re-download on new devices.
 5. **Server validation:** if economy or leaderboards matter, always validate client-reported progression server-side. Log events (level started, level completed, currency earned) and verify they match legitimate play patterns.
+6. **IL2CPP stripping:** saved types are deserialized via Newtonsoft reflection (`token.ToObject<T>()`), which the IL2CPP stripper cannot see — preserve your save-model types in a `link.xml` or they fail to deserialize **on device only**. Template + details: `Samples~/BootstrapScene/link.xml` and PITFALLS → "IL2CPP strips save-model types".
+7. **Corrupt-file quarantine:** decrypt/parse failures move the file to `save.dat.corrupt` before resetting. Wire your support flow to upload that file — it is the only recovery artifact a player has.
 
 ## Design Rationale
 

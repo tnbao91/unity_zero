@@ -32,11 +32,21 @@ using Resolution = Reflex.Enums.Resolution;
 
 namespace Zero.Bootstrap
 {
-    // Marked partial so consumers can add their own services in
-    // ProjectScopeInstaller.UserServices.cs without forking the template.
+    // Marked partial for the template-CLONE workflow only: a fork can drop a
+    // ProjectScopeInstaller.UserServices.cs next to this file. UPM consumers
+    // CANNOT use it (C# partials never span assemblies) — their seams are their
+    // own ContainerScope.OnRootContainerBuilding installer (bindings; last
+    // registration wins) and BootstrapStepRegistration (pipeline steps).
     public static partial class ProjectScopeInstaller
     {
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        // BeforeSplashScreen, not BeforeSceneLoad: Reflex resets the delegate at
+        // AfterAssembliesLoaded, and consumer installers subscribe at
+        // BeforeSceneLoad. Sitting between the two guarantees the template's
+        // bindings always register FIRST, so a consumer's re-registration of the
+        // same contract deterministically wins (Reflex resolves the LAST binding).
+        // Cross-assembly ordering inside the same load type is unspecified — do
+        // not move this back to BeforeSceneLoad.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSplashScreen)]
         private static void Hook()
         {
             ContainerScope.OnRootContainerBuilding -= InstallBindings;
@@ -78,7 +88,8 @@ namespace Zero.Bootstrap
                 Lifetime.Singleton,
                 Resolution.Lazy);
 
-            // Hook for consumer extensions — see ProjectScopeInstaller.UserServices.cs.
+            // Fork-mode hook only (see the partial note on the class). UPM
+            // consumers extend via their own OnRootContainerBuilding installer.
             InstallUserBindings(builder);
 
             // Pipeline factory — explicit step list keeps ordering deterministic.
@@ -102,6 +113,7 @@ namespace Zero.Bootstrap
                 var notif = c.Resolve<INotificationService>();
                 var versionCheck = c.Resolve<IVersionCheckService>();
                 var reporter = c.Resolve<IBootstrapProgressReporter>();
+                var bus = c.Resolve<IEventBus>();
 
                 // Order: Crashlytics first (critical), Log/Profile next so subsequent steps
                 // can log + read device info, Save moved up so any later step can read
@@ -110,7 +122,7 @@ namespace Zero.Bootstrap
                 // / Ads / IAP surface any localized errors. UIService has no bootstrap
                 // step — consumers attach a UIRoot MonoBehaviour to their scene to wire
                 // layer canvases at scene-load time.
-                var steps = new IBootstrapStep[]
+                var defaultSteps = new IBootstrapStep[]
                 {
                     new CrashlyticsStep(crash),
                     new LogStep(log),
@@ -129,12 +141,21 @@ namespace Zero.Bootstrap
                     new NotificationStep(notif),
                     new VersionCheckStep(versionCheck),
                 };
-                return new BootstrapPipeline(steps, log, reporter);
+
+                // Consumer seam: BootstrapStepRegistrations registered from a
+                // consumer's own OnRootContainerBuilding installer are composed
+                // onto the defaults (Append/Before/After/Replace by step name) —
+                // see docs/architecture/bootstrap-pipeline.md.
+                var steps = BootstrapStepComposer.Compose(
+                    defaultSteps, c.All<BootstrapStepRegistration>());
+
+                return new BootstrapPipeline(steps, log, reporter, bus);
             }, Lifetime.Singleton, Resolution.Lazy);
         }
 
-        // Defined as `partial` so consumers can add additional bindings without
-        // editing this file. See ProjectScopeInstaller.UserServices.cs in their fork.
+        // Fork-mode seam: implementable only from inside this assembly (C#
+        // partials cannot span assemblies). With no implementation the compiler
+        // erases the call. UPM consumers: use OnRootContainerBuilding instead.
         static partial void InstallUserBindings(ContainerBuilder builder);
     }
 }

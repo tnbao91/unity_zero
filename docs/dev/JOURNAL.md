@@ -329,3 +329,60 @@ Release entry. Closes out the deferred bumps from the two `[Unreleased]` entries
 - **SafeDestroy de-dup** (rolled in from the `[Unreleased]` entry above): consolidated into one `public static Zero.Infrastructure.Util.SafeDestroy(GameObject)`. No behavior change.
 - Verification: lint + Test Runner via `game-ci` CI (`.github/workflows/{lint,tests}.yml`). Tag `v0.3.0` + GitHub release created post-merge.
 - Resume hint: docs-only follow-up since — backfilled the 6 infra/policy service docs (`asset`, `scene`, `log`, `device-profile`, `events`, `adplacement`) that lacked a `docs/services/*.md`. No open phase.
+
+---
+
+## Phase 6 — 2026-06-11 (branch `phase-6-hardening`, merged to `main`) — v0.4.0
+
+> Editor verification confirmed by user 2026-06-12: Play `Bootstrap.unity` all 16 steps complete, Test Runner all green (101 EditMode). Phase-close audit: MERGE-READY (6/6 PASS).
+
+Production hardening from the v0.3.0 full review (3 Explore agents + line-level manual verification + Plan-agent design review). Runtime: bootstrap failure seam, Crashlytics criticality default, save corruption quarantine + dispose flush, popup bookkeeping fix, consumer bootstrap-step seam, boundary guards. Docs: extension-story overhaul — the documented `ProjectScopeInstaller.UserServices.cs` partial seam is invalid C# across assemblies (partials cannot span assemblies; UPM consumers cannot use it, forks are deny-ruled), replaced by `ContainerScope.OnRootContainerBuilding` + step-registration recipes — plus IL2CPP/AOT `link.xml` guidance.
+
+### Spec
+
+User-visible behavior:
+
+- A pipeline abort (critical step failure or timeout) publishes `BootstrapFailed { StepName, Error, Attempt }` on `IEventBus` and surfaces as `BootstrapStepFailedException` (was: raw exception, no event — player stuck on loading with no consumer seam). A consumer loading screen can subscribe and publish `BootstrapRetryRequested`; `GameLauncher` then re-runs the pipeline (steps must be idempotent — new PITFALLS entry).
+- `CrashlyticsStep` no longer blocks app launch when a real SDK is swapped in and fails: `IsCritical => false`, `Timeout => 5s`, still first in order (ordering ≠ criticality — the old comment conflated the two).
+- A corrupt/tampered save file is quarantined to `save.dat.corrupt` before resetting to empty (forensics + recovery path); `Dispose()` synchronously flushes a pending debounced save (quitting inside the 1s debounce window no longer loses data). Mobile-first recipe (`OnApplicationPause(true) → SaveAsync`) documented in `docs/services/save.md`.
+- Consumers add/replace/reorder bootstrap steps from their own asmdef by registering `BootstrapStepRegistration` (Append / Before / After / Replace anchors) in their `OnRootContainerBuilding` installer — no package fork, no partial.
+- Boundary guards: `LogService.Error(null exception)` and empty-text / negative-duration toasts are safe no-ops/clamps; interleaved popup push+cancel no longer pops the wrong `_activePopups` entry; a `link.xml` sample ships in `Samples~/BootstrapScene` for IL2CPP stripping of save-persisted types.
+
+Acceptance criteria — EditMode tests that will exist on this branch (executable spec, final authority):
+
+- `BootstrapPipelineTests.CriticalStepFailure_PublishesBootstrapFailed_WithStepNameAndAttempt`
+- `BootstrapPipelineTests.CriticalStepFailure_ThrowsBootstrapStepFailedException_WithStepName`
+- `BootstrapPipelineTests.CriticalStepTimeout_PublishesBootstrapFailed`
+- `CrashlyticsStepTests.InitFailure_DoesNotAbortPipeline`
+- `CrashlyticsStepTests.TimeoutDefault_IsFiveSeconds`
+- `SaveServiceTests.CorruptFile_QuarantinedBeforeReset`
+- `SaveServiceTests.DisposeWithPendingDebouncedSave_FlushesToDisk`
+- `LogServiceTests.ErrorNullException_DoesNotThrow`
+- `ToastQueueTests.ShowEmptyText_Ignored`
+- `ToastQueueTests.ShowNegativeDuration_ClampedToMinimum`
+- `BootstrapStepComposerTests.Append_AddsToEnd`
+- `BootstrapStepComposerTests.InsertBefore_PlacesBeforeAnchor`
+- `BootstrapStepComposerTests.InsertAfter_PlacesAfterAnchor`
+- `BootstrapStepComposerTests.Replace_SwapsAnchorStep`
+- `BootstrapStepComposerTests.UnknownAnchorStep_Throws`
+- `ReflexRegistrationOrderTests.ResolveAll_PreservesRegistrationOrder`
+- `UIServicePopupBookkeepingTests.InterleavedPushCancel_RemovesOwnEntryOnly`
+
+### Implementation (close)
+
+All 17 spec tests implemented; EditMode suite 82 → 101 methods. One commit per item (A1…A8 + docs + version): `ab670b4` failure seam, `236d542` Crashlytics flip, `1ef06c5` save quarantine+flush, `65212cb` boundary guards, `cd8d457` step seam, `db94d8d` popup bookkeeping, `02f621a` docs overhaul.
+
+**Decisions** (design-reviewed via a Plan agent before implementation):
+
+- **Pipeline publishes `BootstrapFailed`, launcher owns whole-run retry.** The pipeline has the step identity (name/attempt/exception) — publishing there avoids string-parsing in the launcher; per-step retry stays pipeline policy, whole-run retry stays launcher policy. Spec change: the two pre-existing critical-abort tests now assert `BootstrapStepFailedException` (inner = original) instead of the raw exception — deliberate contract evolution per this phase's spec, not test-weakening.
+- **Crashlytics: ordering ≠ criticality.** Kept first (later failures get reported) but non-critical + 5s timeout: aborting launch on a crash-reporter outage produces zero reports anyway, and a hanging real SDK must not own 30s of splash. Documented per-step defaults table in `bootstrap-pipeline.md`.
+- **Save dispose-flush is a dedicated sync write core**, NOT block-on-`SaveAsync` — its `SwitchToMainThread` continuation can never run while `Dispose` blocks the main thread (deadlock). `Wait(0)`: if a save is in flight its snapshot is at least as fresh; skip. `_dirty` cleared at snapshot time, restored on write failure. No `ISaveService` interface change (interface additions break binding-swap consumers); the mobile-primary path is the `OnApplicationPause → SaveAsync` recipe (suspended apps are killed without `Dispose`).
+- **Step seam = container-registered descriptors, not a partial hook.** Phase 6's biggest review finding: C# partials cannot span assemblies, so the documented `ProjectScopeInstaller.UserServices.cs` consumer seam was invalid for UPM consumers (and recipe §5's sample overrode the non-virtual `ExecuteAsync` — didn't compile). `BootstrapStepRegistration` (Append/Before/After/Replace + anchor name) composed by `BootstrapStepComposer` in registration order; unknown anchors throw at boot. `ReflexRegistrationOrderTests` pins the Reflex `All<T>()` ordering the seam depends on.
+- **Hook moved `BeforeSceneLoad` → `BeforeSplashScreen`.** Reflex resets the delegate at `AfterAssembliesLoaded`; consumers subscribe at `BeforeSceneLoad`. Sitting between makes template-first registration (and therefore consumer last-write-wins override) deterministic — cross-assembly ordering within one load type is unspecified in Unity.
+- **Popup fix swept same-shape:** blind `Pop()` existed in `UIService._activePopups` (OCE handler), the close path (popup may not be top when it resolves), and `PopupStack` — all three now remove by reference. Top-of-stack semantics of `Push/TryPop/TryPeek/TryReplace` preserved (pre-existing `PopupStackTests` unchanged).
+- **Docs drift found during the pass** (fixed in `02f621a`): `extension-points.md` used a nonexistent `ISaveService.Get<T>(key, default)` ×3, implemented wrong `ICrashlyticsService` members, claimed "auto-saves on app pause" (false — that gap is this phase's C4 fix), advised subclassing the sealed save service's `private static Migrate`, and recommended `[DefaultExecutionOrder]` for load-method ordering (no effect). PITFALLS' "only `CrashlyticsStep` is critical" was stale (Asset/Consent/DeviceProfile are critical).
+
+**Files**: `Runtime/Core/{Events/BootstrapEvents,BootstrapStepFailedException,BootstrapStepRegistration}.cs` (new) · `Runtime/Bootstrap/{BootstrapPipeline,GameLauncher,ProjectScopeInstaller,BootstrapStepComposer(new)}.cs` · `Runtime/Bootstrap/Steps/CrashlyticsStep.cs` · `Runtime/Services/Save/EncryptedJsonSaveService.cs` · `Runtime/Services/Log/LogService.cs` · `Runtime/UI/{UIService,PopupStack,ToastQueue}.cs` · `Tests/EditMode/` (5 new files + 3 extended) · `Samples~/BootstrapScene/link.xml` (new) · `Samples~/ClaudeMemory/{CLAUDE.md,claude-context/extension-points.md}` · `docs/{architecture/bootstrap-pipeline,services/save,security/save-encryption,dev/PITFALLS}.md` · `CLAUDE.md` · CHANGELOG ×2 · `package.json` 0.3.0 → **0.4.0** (additive public API).
+
+- Verification: static only so far. **Editor verification pending — Claude cannot open Unity; user to run Test Runner EditMode (expect 101 green, incl. the 17 spec tests) + Play `Bootstrap.unity` (16 steps complete; optionally make a step throw to see `BootstrapFailed` → retry).** `/pre-pr` reviewers + CI must be green before merge; tag `v0.4.0` + GitHub release after merge.
+- Resume hint: PR-2 (CI guards: unityVersion↔ProjectVersion sync check, agent-mirror drift check) and the GitHub ruleset (require lint+test checks on `main`) follow after this PR merges — see the Phase 6 plan file.

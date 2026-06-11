@@ -11,7 +11,11 @@ namespace Zero.UI
     internal sealed class PopupStack
     {
         private readonly Queue<GameObject> _queue = new();
-        private readonly Stack<PopupEntry> _stack = new();
+        // List-as-stack (end = top): TryRemove must evict a specific popup's
+        // entry by reference when its push is cancelled or it closes while no
+        // longer on top — Stack.Pop() would evict whichever popup is topmost
+        // (same bug shape as UIService._activePopups, fixed together in Phase 6).
+        private readonly List<PopupEntry> _stack = new();
         private int _sortOrderOffset;
 
         public int Count => _stack.Count;
@@ -31,7 +35,7 @@ namespace Zero.UI
                 Instance = popupInstance,
                 AssignedSortOrder = sortOrder
             };
-            _stack.Push(entry);
+            _stack.Add(entry);
             _sortOrderOffset++;
             return sortOrder;
         }
@@ -40,7 +44,8 @@ namespace Zero.UI
         {
             if (_stack.Count > 0)
             {
-                var entry = _stack.Pop();
+                var entry = _stack[_stack.Count - 1];
+                _stack.RemoveAt(_stack.Count - 1);
                 popupInstance = entry.Instance;
                 _sortOrderOffset--;
                 return true;
@@ -50,11 +55,31 @@ namespace Zero.UI
             return false;
         }
 
+        /// <summary>
+        /// Remove a specific popup's entry by reference, wherever it sits in the
+        /// stack. Returns false when the instance was never pushed (e.g. a popup
+        /// without a Canvas) — callers treat that as a no-op.
+        /// </summary>
+        public bool TryRemove(GameObject popupInstance)
+        {
+            for (int i = _stack.Count - 1; i >= 0; i--)
+            {
+                if (ReferenceEquals(_stack[i].Instance, popupInstance))
+                {
+                    _stack.RemoveAt(i);
+                    _sortOrderOffset--;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public bool TryPeek(out GameObject popupInstance)
         {
             if (_stack.Count > 0)
             {
-                popupInstance = _stack.Peek().Instance;
+                popupInstance = _stack[_stack.Count - 1].Instance;
                 return true;
             }
 
@@ -75,15 +100,14 @@ namespace Zero.UI
         {
             if (_stack.Count > 0)
             {
-                var oldEntry = _stack.Pop();
+                var oldEntry = _stack[_stack.Count - 1];
                 oldInstance = oldEntry.Instance;
 
-                var newEntry = new PopupEntry
+                _stack[_stack.Count - 1] = new PopupEntry
                 {
                     Instance = newPopupInstance,
                     AssignedSortOrder = layerBaseSortOrder + (_sortOrderOffset - 1)
                 };
-                _stack.Push(newEntry);
                 return true;
             }
 

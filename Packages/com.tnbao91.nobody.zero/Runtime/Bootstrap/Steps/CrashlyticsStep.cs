@@ -9,7 +9,13 @@ namespace Zero.Bootstrap.Steps
     public sealed class CrashlyticsStep : BootstrapStepBase
     {
         public override string Name => "Crashlytics";
-        public override bool IsCritical => true;
+
+        // First in pipeline order so later failures get reported (ordering), but a
+        // crash-reporter outage must never block app launch (criticality) — aborting
+        // launch produces zero reports either way. 5s caps the splash-screen cost
+        // when a real SDK hangs; see PITFALLS "swap a real SDK into a bootstrap step".
+        public override bool IsCritical => false;
+        public override TimeSpan Timeout => TimeSpan.FromSeconds(5);
 
         private readonly ICrashlyticsService _service;
 
