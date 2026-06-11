@@ -24,7 +24,10 @@ namespace Zero.UI
         private readonly ILogService _logService;
         private readonly Dictionary<Core.UiLayer, Transform> _layerRoots = new();
         private readonly Dictionary<Core.UiLayer, PopupStack> _popupStacks = new();
-        private readonly Stack<(GameObject instance, IPopupHandle handle, string key, GameObject backdrop)> _activePopups = new();
+        // List-as-stack (end = top): a cancelled PushAsync must remove ITS OWN
+        // entry by reference — Stack.Pop() evicted whichever popup was on top
+        // when two pushes interleaved, so the next PopAsync closed the wrong one.
+        private readonly List<(GameObject instance, IPopupHandle handle, string key, GameObject backdrop)> _activePopups = new();
 
         private ScreenManager _screenManager;
         private ToastQueue _toastQueue;
@@ -178,7 +181,7 @@ namespace Zero.UI
                 popupComponent.SetHandle(handle);
 
                 // Track the active popup for potential cancellation (includes backdrop)
-                _activePopups.Push((popupInstance, (IPopupHandle)handle, popupKey, backdrop));
+                _activePopups.Add((popupInstance, (IPopupHandle)handle, popupKey, backdrop));
 
                 // Set the sort order
                 var canvas = popupInstance.GetComponent<Canvas>();
@@ -197,8 +200,8 @@ namespace Zero.UI
                 {
                     Util.SafeDestroy(popupInstance);
                     if (backdrop != null) Util.SafeDestroy(backdrop);
-                    if (_activePopups.Count > 0) _activePopups.Pop();
-                    _popupStacks[Core.UiLayer.Popup].TryPop(out _);
+                    RemoveActivePopup(popupInstance);
+                    _popupStacks[Core.UiLayer.Popup].TryRemove(popupInstance);
                     throw;
                 }
 
@@ -218,24 +221,24 @@ namespace Zero.UI
                     throw;
                 }
 
-                // Close the popup
+                // Close the popup — remove by reference: this popup may no longer
+                // be on top if another one opened above it while we awaited.
                 await popupComponent.OnCloseAsync(result, ct);
                 Util.SafeDestroy(popupInstance);
                 if (backdrop != null) Util.SafeDestroy(backdrop);
-
-                // Pop from stack
-                _popupStacks[Core.UiLayer.Popup].TryPop(out _);
-
-                // Remove from active popups
-                if (_activePopups.Count > 0 && _activePopups.Peek().backdrop == backdrop)
-                {
-                    _activePopups.Pop();
-                }
+                _popupStacks[Core.UiLayer.Popup].TryRemove(popupInstance);
+                RemoveActivePopup(popupInstance);
 
                 // Publish close event
                 _eventBus.Publish(new PopupClosed(popupKey));
 
                 return result;
+            }
+            catch (OperationCanceledException)
+            {
+                // Routine: push cancelled or popped externally — bookkeeping is
+                // already cleaned up above / by PopAsync. Not an error.
+                throw;
             }
             catch (Exception ex)
             {
@@ -257,7 +260,8 @@ namespace Zero.UI
 
             if (_activePopups.Count > 0)
             {
-                var (popupInstance, handle, popupKey, backdrop) = _activePopups.Pop();
+                var (popupInstance, handle, popupKey, backdrop) = _activePopups[_activePopups.Count - 1];
+                _activePopups.RemoveAt(_activePopups.Count - 1);
 
                 // Cancel the handle to unblock the PushAsync awaiter
                 handle.Cancel();
@@ -266,8 +270,8 @@ namespace Zero.UI
                 Util.SafeDestroy(popupInstance);
                 if (backdrop != null) Util.SafeDestroy(backdrop);
 
-                // Pop from stack
-                _popupStacks[Core.UiLayer.Popup].TryPop(out _);
+                // Remove from the sort-order stack by reference
+                _popupStacks[Core.UiLayer.Popup].TryRemove(popupInstance);
 
                 // Publish close event
                 _eventBus.Publish(new PopupClosed(popupKey));
@@ -317,6 +321,18 @@ namespace Zero.UI
             }
 
             _toastQueue.Show(text, duration);
+        }
+
+        private void RemoveActivePopup(GameObject popupInstance)
+        {
+            for (int i = _activePopups.Count - 1; i >= 0; i--)
+            {
+                if (ReferenceEquals(_activePopups[i].instance, popupInstance))
+                {
+                    _activePopups.RemoveAt(i);
+                    return;
+                }
+            }
         }
 
         public Transform GetLayerRoot(Core.UiLayer layer)
