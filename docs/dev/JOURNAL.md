@@ -329,3 +329,39 @@ Release entry. Closes out the deferred bumps from the two `[Unreleased]` entries
 - **SafeDestroy de-dup** (rolled in from the `[Unreleased]` entry above): consolidated into one `public static Zero.Infrastructure.Util.SafeDestroy(GameObject)`. No behavior change.
 - Verification: lint + Test Runner via `game-ci` CI (`.github/workflows/{lint,tests}.yml`). Tag `v0.3.0` + GitHub release created post-merge.
 - Resume hint: docs-only follow-up since — backfilled the 6 infra/policy service docs (`asset`, `scene`, `log`, `device-profile`, `events`, `adplacement`) that lacked a `docs/services/*.md`. No open phase.
+
+---
+
+## Phase 6 — 2026-06-11 (branch `phase-6-hardening`, OPEN)
+
+Production hardening from the v0.3.0 full review (3 Explore agents + line-level manual verification + Plan-agent design review). Runtime: bootstrap failure seam, Crashlytics criticality default, save corruption quarantine + dispose flush, popup bookkeeping fix, consumer bootstrap-step seam, boundary guards. Docs: extension-story overhaul — the documented `ProjectScopeInstaller.UserServices.cs` partial seam is invalid C# across assemblies (partials cannot span assemblies; UPM consumers cannot use it, forks are deny-ruled), replaced by `ContainerScope.OnRootContainerBuilding` + step-registration recipes — plus IL2CPP/AOT `link.xml` guidance.
+
+### Spec
+
+User-visible behavior:
+
+- A pipeline abort (critical step failure or timeout) publishes `BootstrapFailed { StepName, Error, Attempt }` on `IEventBus` and surfaces as `BootstrapStepFailedException` (was: raw exception, no event — player stuck on loading with no consumer seam). A consumer loading screen can subscribe and publish `BootstrapRetryRequested`; `GameLauncher` then re-runs the pipeline (steps must be idempotent — new PITFALLS entry).
+- `CrashlyticsStep` no longer blocks app launch when a real SDK is swapped in and fails: `IsCritical => false`, `Timeout => 5s`, still first in order (ordering ≠ criticality — the old comment conflated the two).
+- A corrupt/tampered save file is quarantined to `save.dat.corrupt` before resetting to empty (forensics + recovery path); `Dispose()` synchronously flushes a pending debounced save (quitting inside the 1s debounce window no longer loses data). Mobile-first recipe (`OnApplicationPause(true) → SaveAsync`) documented in `docs/services/save.md`.
+- Consumers add/replace/reorder bootstrap steps from their own asmdef by registering `BootstrapStepRegistration` (Append / Before / After / Replace anchors) in their `OnRootContainerBuilding` installer — no package fork, no partial.
+- Boundary guards: `LogService.Error(null exception)` and empty-text / negative-duration toasts are safe no-ops/clamps; interleaved popup push+cancel no longer pops the wrong `_activePopups` entry; a `link.xml` sample ships in `Samples~/BootstrapScene` for IL2CPP stripping of save-persisted types.
+
+Acceptance criteria — EditMode tests that will exist on this branch (executable spec, final authority):
+
+- `BootstrapPipelineTests.CriticalStepFailure_PublishesBootstrapFailed_WithStepNameAndAttempt`
+- `BootstrapPipelineTests.CriticalStepFailure_ThrowsBootstrapStepFailedException_WithStepName`
+- `BootstrapPipelineTests.CriticalStepTimeout_PublishesBootstrapFailed`
+- `CrashlyticsStepTests.InitFailure_DoesNotAbortPipeline`
+- `CrashlyticsStepTests.TimeoutDefault_IsFiveSeconds`
+- `SaveServiceTests.CorruptFile_QuarantinedBeforeReset`
+- `SaveServiceTests.DisposeWithPendingDebouncedSave_FlushesToDisk`
+- `LogServiceTests.ErrorNullException_DoesNotThrow`
+- `ToastQueueTests.ShowEmptyText_Ignored`
+- `ToastQueueTests.ShowNegativeDuration_ClampedToMinimum`
+- `BootstrapStepComposerTests.Append_AddsToEnd`
+- `BootstrapStepComposerTests.InsertBefore_PlacesBeforeAnchor`
+- `BootstrapStepComposerTests.InsertAfter_PlacesAfterAnchor`
+- `BootstrapStepComposerTests.Replace_SwapsAnchorStep`
+- `BootstrapStepComposerTests.UnknownAnchorStep_Throws`
+- `ReflexRegistrationOrderTests.ResolveAll_PreservesRegistrationOrder`
+- `UIServicePopupBookkeepingTests.InterleavedPushCancel_RemovesOwnEntryOnly`
