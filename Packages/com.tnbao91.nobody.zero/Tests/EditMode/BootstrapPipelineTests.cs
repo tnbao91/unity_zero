@@ -8,7 +8,9 @@ using R3;
 using UnityEngine.TestTools;
 using Zero.Bootstrap;
 using Zero.Core;
+using Zero.Core.Events;
 using Zero.Infrastructure;
+using Zero.Services.Events;
 
 namespace Zero.Tests.EditMode
 {
@@ -57,7 +59,11 @@ namespace Zero.Tests.EditMode
                 await pipeline.RunAsync(null, CancellationToken.None);
                 Assert.Fail("Expected pipeline to throw on critical step.");
             }
-            catch (InvalidOperationException) { /* expected */ }
+            catch (BootstrapStepFailedException ex)
+            {
+                Assert.IsInstanceOf<InvalidOperationException>(ex.InnerException,
+                    "Original failure must be preserved as InnerException.");
+            }
 
             Assert.AreEqual(new[] { "A", "Boom" }, calls);
         });
@@ -143,9 +149,13 @@ namespace Zero.Tests.EditMode
             try
             {
                 await pipeline.RunAsync(null, CancellationToken.None);
-                Assert.Fail("Expected TimeoutException on critical step.");
+                Assert.Fail("Expected BootstrapStepFailedException on critical timeout.");
             }
-            catch (TimeoutException) { /* expected */ }
+            catch (BootstrapStepFailedException ex)
+            {
+                Assert.IsInstanceOf<TimeoutException>(ex.InnerException,
+                    "Timeout must be preserved as InnerException.");
+            }
 
             CollectionAssert.Contains(calls, "A");
             CollectionAssert.DoesNotContain(calls, "Tail");
@@ -166,6 +176,76 @@ namespace Zero.Tests.EditMode
             await pipeline.RunAsync(null, CancellationToken.None);
 
             Assert.AreEqual(3, attempts.Count, "Step should run exactly 3 times (initial + 2 retries).");
+        });
+
+        [UnityTest]
+        public IEnumerator CriticalStepFailure_PublishesBootstrapFailed_WithStepNameAndAttempt() => UniTask.ToCoroutine(async () =>
+        {
+            using var bus = new R3EventBus();
+            var observed = new List<BootstrapFailed>();
+            using var sub = bus.On<BootstrapFailed>().Subscribe(observed.Add);
+
+            var pipeline = new BootstrapPipeline(new IBootstrapStep[]
+            {
+                new ThrowingStep("Boom", null, isCritical: true, maxRetries: 0),
+            }, _log, _reporter, bus);
+
+            try
+            {
+                await pipeline.RunAsync(null, CancellationToken.None);
+                Assert.Fail("Expected pipeline to abort on critical step.");
+            }
+            catch (BootstrapStepFailedException) { /* expected */ }
+
+            Assert.AreEqual(1, observed.Count, "Abort must publish exactly one BootstrapFailed.");
+            Assert.AreEqual("Boom", observed[0].StepName);
+            Assert.AreEqual(1, observed[0].Attempt);
+            Assert.IsInstanceOf<InvalidOperationException>(observed[0].Error);
+        });
+
+        [UnityTest]
+        public IEnumerator CriticalStepFailure_ThrowsBootstrapStepFailedException_WithStepName() => UniTask.ToCoroutine(async () =>
+        {
+            var pipeline = new BootstrapPipeline(new IBootstrapStep[]
+            {
+                new ThrowingStep("Boom", null, isCritical: true, maxRetries: 0),
+            }, _log, _reporter);
+
+            try
+            {
+                await pipeline.RunAsync(null, CancellationToken.None);
+                Assert.Fail("Expected pipeline to abort on critical step.");
+            }
+            catch (BootstrapStepFailedException ex)
+            {
+                Assert.AreEqual("Boom", ex.StepName);
+                Assert.AreEqual(1, ex.Attempt);
+                Assert.IsInstanceOf<InvalidOperationException>(ex.InnerException);
+            }
+        });
+
+        [UnityTest]
+        public IEnumerator CriticalStepTimeout_PublishesBootstrapFailed() => UniTask.ToCoroutine(async () =>
+        {
+            using var bus = new R3EventBus();
+            var observed = new List<BootstrapFailed>();
+            using var sub = bus.On<BootstrapFailed>().Subscribe(observed.Add);
+
+            var pipeline = new BootstrapPipeline(new IBootstrapStep[]
+            {
+                new HangingStep("Hang", TimeSpan.FromMilliseconds(50), isCritical: true, maxRetries: 0),
+            }, _log, _reporter, bus);
+
+            try
+            {
+                await pipeline.RunAsync(null, CancellationToken.None);
+                Assert.Fail("Expected pipeline to abort on critical timeout.");
+            }
+            catch (BootstrapStepFailedException) { /* expected */ }
+
+            Assert.AreEqual(1, observed.Count, "Abort must publish exactly one BootstrapFailed.");
+            Assert.AreEqual("Hang", observed[0].StepName);
+            Assert.IsInstanceOf<TimeoutException>(observed[0].Error);
         });
 
         private static async UniTaskVoid CancelAfter(CancellationTokenSource cts, int delayMs)

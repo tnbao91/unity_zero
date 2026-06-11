@@ -102,6 +102,7 @@ namespace Zero.Bootstrap
                 var notif = c.Resolve<INotificationService>();
                 var versionCheck = c.Resolve<IVersionCheckService>();
                 var reporter = c.Resolve<IBootstrapProgressReporter>();
+                var bus = c.Resolve<IEventBus>();
 
                 // Order: Crashlytics first (critical), Log/Profile next so subsequent steps
                 // can log + read device info, Save moved up so any later step can read
@@ -129,7 +130,7 @@ namespace Zero.Bootstrap
                     new NotificationStep(notif),
                     new VersionCheckStep(versionCheck),
                 };
-                return new BootstrapPipeline(steps, log, reporter);
+                return new BootstrapPipeline(steps, log, reporter, bus);
             }, Lifetime.Singleton, Resolution.Lazy);
         }
 
