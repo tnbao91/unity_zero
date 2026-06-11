@@ -36,7 +36,14 @@ namespace Zero.Bootstrap
     // ProjectScopeInstaller.UserServices.cs without forking the template.
     public static partial class ProjectScopeInstaller
     {
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        // BeforeSplashScreen, not BeforeSceneLoad: Reflex resets the delegate at
+        // AfterAssembliesLoaded, and consumer installers subscribe at
+        // BeforeSceneLoad. Sitting between the two guarantees the template's
+        // bindings always register FIRST, so a consumer's re-registration of the
+        // same contract deterministically wins (Reflex resolves the LAST binding).
+        // Cross-assembly ordering inside the same load type is unspecified — do
+        // not move this back to BeforeSceneLoad.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSplashScreen)]
         private static void Hook()
         {
             ContainerScope.OnRootContainerBuilding -= InstallBindings;
@@ -111,7 +118,7 @@ namespace Zero.Bootstrap
                 // / Ads / IAP surface any localized errors. UIService has no bootstrap
                 // step — consumers attach a UIRoot MonoBehaviour to their scene to wire
                 // layer canvases at scene-load time.
-                var steps = new IBootstrapStep[]
+                var defaultSteps = new IBootstrapStep[]
                 {
                     new CrashlyticsStep(crash),
                     new LogStep(log),
@@ -130,6 +137,14 @@ namespace Zero.Bootstrap
                     new NotificationStep(notif),
                     new VersionCheckStep(versionCheck),
                 };
+
+                // Consumer seam: BootstrapStepRegistrations registered from a
+                // consumer's own OnRootContainerBuilding installer are composed
+                // onto the defaults (Append/Before/After/Replace by step name) —
+                // see docs/architecture/bootstrap-pipeline.md.
+                var steps = BootstrapStepComposer.Compose(
+                    defaultSteps, c.All<BootstrapStepRegistration>());
+
                 return new BootstrapPipeline(steps, log, reporter, bus);
             }, Lifetime.Singleton, Resolution.Lazy);
         }
