@@ -1,7 +1,7 @@
 # Zero — Hybrid Casual Unity Template
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Unity 6.0.3.11f1](https://img.shields.io/badge/Unity-6.0.3.11f1-black.svg)](ProjectSettings/ProjectVersion.txt)
+[![Unity 6000.5.0f1](https://img.shields.io/badge/Unity-6000.5.0f1-black.svg)](ProjectSettings/ProjectVersion.txt)
 [![openupm](https://img.shields.io/npm/v/com.tnbao91.nobody.zero?label=openupm&registry_uri=https://package.openupm.com)](https://openupm.com/packages/com.tnbao91.nobody.zero/)
 
 Opinionated Unity 6 LTS template for hybrid casual / puzzle games. Distributed as a Unity Package Manager package — install once, update via Package Manager. Stack: Reflex DI · UniTask · R3 · LitMotion · Addressables · Newtonsoft · ZString · New Input System.
@@ -53,7 +53,7 @@ openupm add com.tnbao91.nobody.zero
 
 Or `Add package by name` → `com.tnbao91.nobody.zero`.
 
-> Latest is `0.4.0`. Pin `0.2.1` or later — tags `v0.1.0` / `v0.2.0` are broken (missing `Runtime/Services/Log/` from a `.gitignore` collision); see the [CHANGELOG](CHANGELOG.md) `0.2.1` entry.
+> Latest is `0.5.0`. Pin `0.2.1` or later — tags `v0.1.0` / `v0.2.0` are broken (missing `Runtime/Services/Log/` from a `.gitignore` collision); see the [CHANGELOG](CHANGELOG.md) `0.2.1` entry.
 
 ### 4. Import Bootstrap sample
 
@@ -117,7 +117,7 @@ Gameplay/Meta/UI never reference each other directly — cross-tier coupling goe
 ### Dev workspace Quick Start
 
 1. **Clone**: `git clone https://github.com/tnbao91/unity_zero.git`.
-2. **Open** in Unity 6.0.3.11f1 (matching `ProjectSettings/ProjectVersion.txt`). Do not let Unity upgrade the project on a different LTS.
+2. **Open** in Unity 6000.5.0f1 (matching `ProjectSettings/ProjectVersion.txt`). Do not let Unity upgrade the project on a different LTS.
 3. **NuGet**: `NuGet → Restore Packages` (NuGetForUnity menu) for R3 BCL transitive deps. Patched plugin metas in this repo enable `Editor.enabled` for R3 + transitive deps; do not let NuGet revert those.
 4. **Encryption seed**: copy `Assets/Resources/ZeroSecrets.asset.example` to `ZeroSecrets.asset`, replace placeholders. Gitignored.
 5. **Open** `Assets/_Project/Scenes/Bootstrap.unity` → Press Play. Pipeline runs all 16 bootstrap steps.
