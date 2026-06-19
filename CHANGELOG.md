@@ -4,6 +4,25 @@ All notable template-level changes are recorded here. Format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-06-20 — Unity 6.5 upgrade
+
+### Changed
+- **Minimum Unity version: 6000.3 → 6000.5 (`6000.5.0f1`).** Consumers on Unity 6.3 must stay on 0.4.x.
+- **`UnityPoolService`: `GetInstanceID()` → `GetEntityId()`.** Unity 6.5 deprecates `Object.GetInstanceID()` (CS0619) in favour of the 64-bit `EntityId` struct. Internal pool dictionaries split into `_goPools: Dictionary<EntityId, GameObjectPool>` and `_wrapPools: Dictionary<(EntityId, Type), IPoolHandle>`, eliminating the fragile int-XOR key for component wrappers. No change to the public `IPoolService` API.
+
+### Package bumps (auto-resolved by Unity 6.5 Package Manager)
+| Package | Old | New |
+|---|---|---|
+| LitMotion | 2.0.1 | 2.0.2 |
+| R3 | 1.3.0 | 1.3.1 |
+| UniTask | 2.5.10 | 2.5.11 |
+| Reflex | 14.3.0 | 14.3.1 |
+| Unity Localization | 1.5.11 | 1.5.12 |
+| Unity Purchasing/IAP | 5.2.1 | 5.3.1 |
+| URP | 17.3.0 | 17.5.0 |
+| Test Framework | 1.6.0 | 1.7.0 |
+| uGUI | 2.0.0 | 2.5.0 |
+
 ## [0.4.0] — 2026-06-11 — Production hardening (Phase 6)
 
 Hardening pass driven by a full-framework review (3 audit agents + line-level manual verification + design review). Minor bump: additive public API (bootstrap failure events + consumer step seam). Two deliberate behavior changes are called out under *Changed*.

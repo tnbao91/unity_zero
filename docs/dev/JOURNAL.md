@@ -385,4 +385,31 @@ All 17 spec tests implemented; EditMode suite 82 → 101 methods. One commit per
 **Files**: `Runtime/Core/{Events/BootstrapEvents,BootstrapStepFailedException,BootstrapStepRegistration}.cs` (new) · `Runtime/Bootstrap/{BootstrapPipeline,GameLauncher,ProjectScopeInstaller,BootstrapStepComposer(new)}.cs` · `Runtime/Bootstrap/Steps/CrashlyticsStep.cs` · `Runtime/Services/Save/EncryptedJsonSaveService.cs` · `Runtime/Services/Log/LogService.cs` · `Runtime/UI/{UIService,PopupStack,ToastQueue}.cs` · `Tests/EditMode/` (5 new files + 3 extended) · `Samples~/BootstrapScene/link.xml` (new) · `Samples~/ClaudeMemory/{CLAUDE.md,claude-context/extension-points.md}` · `docs/{architecture/bootstrap-pipeline,services/save,security/save-encryption,dev/PITFALLS}.md` · `CLAUDE.md` · CHANGELOG ×2 · `package.json` 0.3.0 → **0.4.0** (additive public API).
 
 - Verification: static only so far. **Editor verification pending — Claude cannot open Unity; user to run Test Runner EditMode (expect 101 green, incl. the 17 spec tests) + Play `Bootstrap.unity` (16 steps complete; optionally make a step throw to see `BootstrapFailed` → retry).** `/pre-pr` reviewers + CI must be green before merge; tag `v0.4.0` + GitHub release after merge.
+
+---
+
+## Unity 6.5 Upgrade — 2026-06-20 (main) — v0.5.0
+
+Unity upgraded from `6000.3.11f1` → `6000.5.0f1`. Package Manager auto-resolved 9 package bumps. One source change required.
+
+### Breaking change fixed
+
+`Object.GetInstanceID()` deprecated (CS0619) in Unity 6.5 — replaced by `Object.GetEntityId()` returning `EntityId` (64-bit struct). Three call sites in `UnityPoolService.cs`. Internal dictionaries restructured: single `Dictionary<int, IPoolHandle>` with XOR key hack replaced by `Dictionary<EntityId, GameObjectPool> _goPools` + `Dictionary<(EntityId, Type), IPoolHandle> _wrapPools`. Public `IPoolService` API unchanged.
+
+### Non-issues (explicitly verified)
+
+- `UIDocument` → `Panel Renderer`: no `UIDocument` in package Runtime; template delegates UI to consumer.
+- Built-in RP deprecated: template uses URP 17.5.0.
+- Input System: only Linux IME added; no API impact.
+- Dynamic Batching deprecated: not explicitly set in ProjectSettings.
+- Unity Mathematics now built-in: not used as standalone dep.
+- 2D Physics rename (LowLevelPhysics2D → PhysicsCore2D): auto-handled by Unity (`com.unity.modules.physicscore2d` added to manifest, `PhysicsCoreProjectSettings2D.asset` created).
+
+### Package bumps (auto-resolved)
+
+LitMotion 2.0.1→2.0.2 · R3 1.3.0→1.3.1 · UniTask 2.5.10→2.5.11 · Reflex 14.3.0→14.3.1 · Localization 1.5.11→1.5.12 · Purchasing 5.2.1→5.3.1 · URP 17.3.0→17.5.0 · Test Framework 1.6.0→1.7.0 · uGUI 2.0.0→2.5.0.
+
+**Files**: `Runtime/Services/Pool/UnityPoolService.cs` · `package.json` 0.4.0→0.5.0 · `Packages/manifest.json` · `Packages/packages-lock.json` · `ProjectSettings/ProjectVersion.txt` · `ProjectSettings/PhysicsCoreProjectSettings2D.asset` (new) · `CLAUDE.md` · `CHANGELOG.md` ×2.
+
+**Verification**: Claude cannot open Unity. User to confirm 0 compiler errors + EditMode tests green + `Bootstrap.unity` Play green. Tag `v0.5.0` + GitHub release after verify.
 - Resume hint: PR-2 (CI guards: unityVersion↔ProjectVersion sync check, agent-mirror drift check) and the GitHub ruleset (require lint+test checks on `main`) follow after this PR merges — see the Phase 6 plan file.

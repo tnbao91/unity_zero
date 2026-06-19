@@ -4,6 +4,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; per-ph
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-06-20 — Unity 6.5 upgrade
+
+Minimum Unity version raised to 6000.5.0f1. No change to public API.
+
+### Changed
+- **`UnityPoolService`: `GetInstanceID()` → `GetEntityId()`.** Unity 6.5 deprecates `Object.GetInstanceID()` (CS0619) in favour of the 64-bit `EntityId` struct. Internal pool dictionaries split into typed `_goPools`/`_wrapPools` — the int-XOR key for component wrappers is gone. Public `IPoolService` unchanged.
+- **Minimum Unity version: 6000.3 → 6000.5.** Consumers on Unity 6.3 must stay on 0.4.x.
+- Package dep bumps auto-resolved by Package Manager on upgrade: LitMotion 2.0.1→2.0.2, R3 1.3.0→1.3.1, UniTask 2.5.10→2.5.11, Reflex 14.3.0→14.3.1, Localization 1.5.11→1.5.12, Purchasing 5.2.1→5.3.1, URP 17.3.0→17.5.0, Test Framework 1.6.0→1.7.0, uGUI 2.0.0→2.5.0.
+
 ## [0.4.0] — 2026-06-11 — Production hardening
 
 Mostly drop-in; read the three action items. Additive public API (minor bump): `BootstrapFailed` / `BootstrapRetryRequested` events, `BootstrapStepFailedException`, `BootstrapStepRegistration` + `BootstrapStepComposer`.
