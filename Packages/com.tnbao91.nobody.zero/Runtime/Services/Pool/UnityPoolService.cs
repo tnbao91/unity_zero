@@ -13,7 +13,8 @@ namespace Zero.Services.Pool
     public sealed class UnityPoolService : IPoolService, IDisposable
     {
         private readonly ILogService _log;
-        private readonly Dictionary<int, IPoolHandle> _pools = new();
+        private readonly Dictionary<EntityId, GameObjectPool> _goPools = new();
+        private readonly Dictionary<(EntityId, Type), IPoolHandle> _wrapPools = new();
         private Transform _root;
         private bool _disposed;
 
@@ -54,14 +55,13 @@ namespace Zero.Services.Pool
             var go = ResolveGameObjectPool(prefab);
             if (typeof(T) == typeof(GameObject)) return (IPool<T>)(object)go;
 
-            int key = prefab.GetInstanceID();
-            int wrapKey = unchecked(key ^ typeof(T).GetHashCode());
-            if (_pools.TryGetValue(wrapKey, out var existing)) return (IPool<T>)existing;
+            var wrapKey = (prefab.GetEntityId(), typeof(T));
+            if (_wrapPools.TryGetValue(wrapKey, out var existing)) return (IPool<T>)existing;
 
             if (typeof(Component).IsAssignableFrom(typeof(T)))
             {
                 var wrapper = new ComponentPool<T>(go);
-                _pools[wrapKey] = wrapper;
+                _wrapPools[wrapKey] = wrapper;
                 return wrapper;
             }
             throw new InvalidOperationException($"[POOL] T={typeof(T).Name} not supported. Use GameObject or Component subclass.");
@@ -70,20 +70,20 @@ namespace Zero.Services.Pool
         public void Clear<T>(T prefab) where T : Object
         {
             if (prefab == null) return;
-            int key = prefab.GetInstanceID();
-            if (_pools.TryGetValue(key, out var pool))
-            {
-                pool.Dispose();
-                _pools.Remove(key);
-            }
+            EntityId id = prefab.GetEntityId();
+            if (_goPools.TryGetValue(id, out var goPool)) { goPool.Dispose(); _goPools.Remove(id); }
+            var wrapKey = (id, typeof(T));
+            if (_wrapPools.TryGetValue(wrapKey, out var wrap)) { wrap.Dispose(); _wrapPools.Remove(wrapKey); }
         }
 
         public void Dispose()
         {
             if (_disposed) return;
             _disposed = true;
-            foreach (var p in _pools.Values) p.Dispose();
-            _pools.Clear();
+            foreach (var p in _goPools.Values) p.Dispose();
+            foreach (var p in _wrapPools.Values) p.Dispose();
+            _goPools.Clear();
+            _wrapPools.Clear();
             if (_root != null) Util.SafeDestroy(_root.gameObject);
         }
 
@@ -92,12 +92,12 @@ namespace Zero.Services.Pool
             GameObject prefabGo = prefab as GameObject ?? (prefab as Component)?.gameObject;
             if (prefabGo == null) throw new InvalidOperationException($"[POOL] T={typeof(T).Name} is not a GameObject or Component");
 
-            int key = prefabGo.GetInstanceID();
-            if (_pools.TryGetValue(key, out var existing)) return (GameObjectPool)existing;
+            EntityId key = prefabGo.GetEntityId();
+            if (_goPools.TryGetValue(key, out var existing)) return existing;
 
             EnsureRoot();
             var pool = new GameObjectPool(prefabGo, _root, _log);
-            _pools[key] = pool;
+            _goPools[key] = pool;
             return pool;
         }
 
