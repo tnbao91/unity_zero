@@ -3,7 +3,7 @@ using System;
 namespace Zero.DevTools
 {
     [AttributeUsage(AttributeTargets.Class)]
-    public class ConsoleCommandAttribute : Attribute
+    public sealed class ConsoleCommandAttribute : Attribute
     {
         public string Name { get; }
         public string Help { get; }

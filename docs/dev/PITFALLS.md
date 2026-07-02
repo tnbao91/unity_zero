@@ -45,7 +45,7 @@ if (Application.isPlaying) Object.Destroy(go);
 else Object.DestroyImmediate(go);
 ```
 
-`UnityPoolService.SafeDestroy(GameObject)` centralizes this — reuse it when adding new disposal paths instead of inlining `Object.Destroy`.
+`Zero.Infrastructure.Util.SafeDestroy(GameObject)` centralizes this — reuse it when adding new disposal paths instead of inlining `Object.Destroy`.
 
 ### `UniTask.Yield()` does not tick in EditMode
 

@@ -101,23 +101,24 @@ The graph above is illustrative — only key edges shown for readability. Every 
 
 ### Tier 1 — `Zero.Core` (interfaces + POCOs)
 
-References: `UniTask`, `R3`. No project-internal asmdef references.
+References: `UniTask`. No project-internal asmdef references. (R3 types appear in interface signatures, but R3 is a NuGetForUnity DLL — auto-included with `overrideReferences:false`; the inert `"R3"` entries were removed from `references[]` in v0.3.0.)
 
 Holds: every `I*Service` interface, cross-cutting event POCOs (`AppPaused`, `AppQuitting`), `IBootstrapStep`, `IBootstrapProgressReporter`. No implementations.
 
 ### Tier 2 — `Zero.Infrastructure`
 
-References: `Zero.Core`, `UniTask`, `R3`.
+References: `Zero.Core`, `UniTask`, `Reflex`.
 
-Holds: `BootstrapStepBase`, `BootstrapPipeline`, `BootstrapProgressReporter`. The pipeline is constructed via Reflex factory in `Zero.Bootstrap.ProjectScopeInstaller`; the steps array there is the source of truth for execution order.
+Holds: `BootstrapStepBase`, `BootstrapProgressReporter`, `Util` (cross-cutting helpers, e.g. `SafeDestroy`). The pipeline itself (`BootstrapPipeline`, `BootstrapStepComposer`) lives in `Zero.Bootstrap` (Tier 5); the steps array in `ProjectScopeInstaller` there is the source of truth for execution order.
 
 ### Tier 3 — Services (one asmdef per service)
 
 22 service asmdefs. Each follows the same shape: references `Zero.Core` + `Zero.Infrastructure` + whatever third-party packages the impl needs (`Unity.Localization`, `LitMotion`, `Unity.InputSystem`, `Unity.Notifications.Unified`, etc.).
 
-**Two services reference `Zero.Services.Events`** because their behavior emits or subscribes to bus events:
+**One service references `Zero.Services.Events`** because its behavior emits bus events:
 - `Zero.Services.VersionCheck` — checks against remote-config keys, may emit a status event in future.
-- (Anywhere else that needs to emit bus events from inside an installer or step.)
+
+Add that reference only where a service must publish bus events itself.
 
 Other services do not depend on the bus directly — they expose their own R3 observables and consumers wire those up.
 
@@ -125,7 +126,7 @@ Other services do not depend on the bus directly — they expose their own R3 ob
 
 - `Zero.UI` — references `Zero.Core`, `Zero.Infrastructure`, `Zero.Services.Events`, plus `Zero.Services.Asset` (for popup/screen/toast prefab loading) and `Zero.Services.Localization` (for `LocalizedText`). Plus `LitMotion`, `Unity.TextMeshPro`, `Unity.Addressables`.
 - `Zero.Meta` — empty placeholder. References: `Zero.Core`, `Zero.Infrastructure`, `Zero.Services.Events`. No impl ships; consumer fills.
-- `Zero.Gameplay` — references `Zero.Core`, `Zero.Infrastructure`, `Zero.Services.Events`, `UniTask`, `R3`, `Reflex`, `LitMotion`. **Does NOT reference `Zero.UI` or `Zero.Meta`** — peer rule. Verify with `grep "Zero.UI\\|Zero.Meta" Assets/_Project/Scripts/Runtime/Gameplay/Zero.Gameplay.asmdef` (must return empty).
+- `Zero.Gameplay` — references `Zero.Core`, `Zero.Infrastructure`, `Zero.Services.Events`, `UniTask`, `Reflex`, `LitMotion`. **Does NOT reference `Zero.UI` or `Zero.Meta`** — peer rule. Verify with `grep "Zero.UI\|Zero.Meta" Packages/com.tnbao91.nobody.zero/Runtime/Gameplay/Zero.Gameplay.asmdef` (must return empty).
 
 ### Tier 5 — Composition root
 
@@ -133,11 +134,11 @@ Other services do not depend on the bus directly — they expose their own R3 ob
 
 ### Aux — `Zero.DevTools`
 
-- `Zero.DevTools` — references `Zero.Core`, `Unity.InputSystem`, `UniTask`, `Reflex`, `R3`. Asmdef-level `defineConstraints: ["UNITY_EDITOR || DEVELOPMENT_BUILD"]` so the assembly is omitted entirely from production builds. Spawned via `[RuntimeInitializeOnLoadMethod(AfterSceneLoad)]` in `DevToolsBootstrap`. Does NOT reference `Zero.Bootstrap` — DevTools commands resolve services through `Container.RootContainer.Construct(Type)` at runtime, not via constructor injection from the composition root.
+- `Zero.DevTools` — references `Zero.Core`, `Unity.InputSystem`, `UniTask`, `Reflex`. Asmdef-level `defineConstraints: ["UNITY_EDITOR || DEVELOPMENT_BUILD"]` so the assembly is omitted entirely from production builds. Spawned via `[RuntimeInitializeOnLoadMethod(AfterSceneLoad)]` in `DevToolsBootstrap`. Does NOT reference `Zero.Bootstrap` — DevTools commands resolve services through `Container.RootContainer.Construct(Type)` at runtime, not via constructor injection from the composition root.
 
 ## Test asmdefs
 
-- `Zero.Tests.EditMode` — `includePlatforms: ["Editor"]`, `defineConstraints: ["UNITY_INCLUDE_TESTS"]`. References every asmdef whose tests live in this module. Currently: Core, Infrastructure, Events, Save, Pool, Log, Audio, Notification, Input, Localization, RemoteConfig, VersionCheck, DevTools, UI, Gameplay, Bootstrap.
+- `Zero.Tests.EditMode` — `includePlatforms: ["Editor"]`, `defineConstraints: ["UNITY_INCLUDE_TESTS"]`. References every asmdef whose tests live in this module. Currently: Core, Infrastructure, AdPlacement, Events, Save, Pool, Log, Audio, Notification, Input, Localization, RemoteConfig, VersionCheck, DevTools, UI, Gameplay, Bootstrap.
 - `Zero.Tests.PlayMode` — empty asmdef placeholder. CI is EditMode-only per `PLAN.md` §2.13.
 
 ## Extension Points

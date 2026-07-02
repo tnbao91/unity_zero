@@ -53,7 +53,7 @@ openupm add com.tnbao91.nobody.zero
 
 Or `Add package by name` → `com.tnbao91.nobody.zero`.
 
-> Latest is `0.5.0`. Pin `0.2.1` or later — tags `v0.1.0` / `v0.2.0` are broken (missing `Runtime/Services/Log/` from a `.gitignore` collision); see the [CHANGELOG](CHANGELOG.md) `0.2.1` entry.
+> Latest is `0.5.1`. Pin `0.2.1` or later — tags `v0.1.0` / `v0.2.0` are broken (missing `Runtime/Services/Log/` from a `.gitignore` collision); see the [CHANGELOG](CHANGELOG.md) `0.2.1` entry.
 
 ### 4. Import Bootstrap sample
 

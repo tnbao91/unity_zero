@@ -21,6 +21,7 @@ namespace Zero.Services.AdPlacement
 
         public bool CanShow(string placementId)
         {
+            if (string.IsNullOrEmpty(placementId)) return false;
             if (!_placements.TryGetValue(placementId, out var p)) return false;
             if (p.SessionShowCount >= p.SessionCap) return false;
             if (Time.realtimeSinceStartup - p.LastShownTime < p.CooldownSec) return false;
@@ -29,6 +30,13 @@ namespace Zero.Services.AdPlacement
 
         public async UniTask<AdShowResult> TryShowAsync(string placementId, CancellationToken ct = default)
         {
+            if (string.IsNullOrEmpty(placementId))
+            {
+                _log.Warn("[ADPLACE] Null or empty placement id");
+                // No placement to read a type from — Interstitial is a filler, same as the
+                // unknown-placement path below. Callers branch on Result, not Type.
+                return new AdShowResult(AdType.Interstitial, AdResult.Failed, placementId, "invalid placement id");
+            }
             if (!_placements.TryGetValue(placementId, out var p))
             {
                 _log.Warn($"[ADPLACE] Unknown placement '{placementId}'");
@@ -52,6 +60,11 @@ namespace Zero.Services.AdPlacement
 
         public void RegisterPlacement(string placementId, AdType type, TimeSpan cooldown, int sessionCap)
         {
+            if (placementId == null) throw new ArgumentNullException(nameof(placementId));
+            if (placementId.Length == 0) throw new ArgumentException("Placement id must be non-empty.", nameof(placementId));
+            if (sessionCap < 1) throw new ArgumentOutOfRangeException(nameof(sessionCap), sessionCap, "Session cap must be >= 1.");
+            if (cooldown < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(cooldown), cooldown, "Cooldown must be >= 0.");
+
             _placements[placementId] = new PlacementState
             {
                 Type = type,
@@ -65,6 +78,7 @@ namespace Zero.Services.AdPlacement
 
         public void NotifyShown(string placementId)
         {
+            if (string.IsNullOrEmpty(placementId)) return;
             if (_placements.TryGetValue(placementId, out var p))
             {
                 p.LastShownTime = Time.realtimeSinceStartup;

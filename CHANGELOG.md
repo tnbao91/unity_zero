@@ -4,6 +4,15 @@ All notable template-level changes are recorded here. Format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-07-02 — Full-project review fixes
+
+### Fixed
+- `DefaultAdPlacementService` boundary guards: null/empty placement ids crashed queries; `RegisterPlacement` accepted invalid caps/cooldowns. First EditMode test suite for the service (15 methods).
+- Constitution/doc drift: `CLAUDE.md` stale Unity version (`6.0.3.11f1` → `6000.5.0f1`), CI description (EditMode-only, PlayMode placeholder is deliberate), `UnityPoolService.SafeDestroy` → `Zero.Infrastructure.Util.SafeDestroy`; `docs/architecture/asmdef-graph.md` re-synced with actual asmdef references (post-v0.3.0 R3 sweep, pipeline location, Events-ref count, verify-grep path).
+
+### Changed
+- CI: workflows no longer double-run on PR pushes (`push` limited to `main`) and superseded runs are cancelled via a concurrency group.
+
 ## [0.5.0] — 2026-06-20 — Unity 6.5 upgrade
 
 ### Changed

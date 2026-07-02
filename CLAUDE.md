@@ -52,7 +52,7 @@ Substitution suggestions are rejected on sight. The user picked these deliberate
 ## Automated gate before PR
 
 - `.github/workflows/lint.yml` (CI) + `.pre-commit-config.yaml` (local) — formatting, EOL, basic static checks.
-- `.github/workflows/tests.yml` (CI) — Unity Test Runner EditMode + PlayMode headless via `game-ci`.
+- `.github/workflows/tests.yml` (CI) — Unity Test Runner EditMode headless via `game-ci`. (PlayMode suite is an intentionally empty placeholder — see `docs/architecture/asmdef-graph.md` §Test asmdefs.)
 - Both must be green before merge. Never bypass `--no-verify` / `--no-gpg-sign` unless the user explicitly asks.
 - AI-side review: spawn `asmdef-boundary-reviewer` + `pitfalls-guard` on the diff before opening the PR.
 - **Harness guardrails (inline, during editing).** Footguns are enforced at the least-powerful tool that can decide them — one catalog (`docs/dev/PITFALLS.md` → "Enforcement surface"), three surfaces: **permission** (path rules in `.claude/settings.json` + consumer `settings.example.json` block edits inside the package / `ask` on deps + version files), **hook** (`.claude/hooks/check-footguns.sh`, warn-only `PostToolUse` catching the context-free subset — legacy `Input.*`, `dynamic`, C# 9 violations, `using R3;`), **agent** (the two reviewers above, for judgment checks). The hook nudges; the agents + CI are the hard gate.
@@ -64,7 +64,7 @@ Substitution suggestions are rejected on sight. The user picked these deliberate
 - Add a real third-party SDK to the template. Mocks only (exception: Unity-shipped packages, already wired).
 - Use legacy `Input.*` API (`Input.touchCount`, `Input.GetKey`, `Input.mousePosition`...). Active Input Handling is "Input System Package" — legacy calls throw at runtime.
 - `RegisterType` for a ctor that takes a primitive or any unbound type. Use `RegisterFactory`.
-- Call `Object.Destroy` or `Object.DontDestroyOnLoad` without an `Application.isPlaying` guard (or use `UnityPoolService.SafeDestroy`). EditMode tests will throw.
+- Call `Object.Destroy` or `Object.DontDestroyOnLoad` without an `Application.isPlaying` guard (or use `Zero.Infrastructure.Util.SafeDestroy`). EditMode tests will throw.
 - Edit a test to make it agree with the spec when the two disagree. Tests are the executable spec and the final authority — fix the prose spec (the `## Spec` block in `JOURNAL.md`), never weaken the test to match it.
 - Use `dynamic` in Runtime code. IL2CPP/AOT does not support the DLR.
 - Subscribe to R3 streams via lambda without `using R3;` at the top of the file. The lambda will bind to the wrong overload (CS1660).
@@ -77,7 +77,7 @@ Substitution suggestions are rejected on sight. The user picked these deliberate
 
 This is a Unity project — no shell-level build script. Verify changes inside the Editor:
 
-- **Open**: Unity 6.0.3.11f1 (see `ProjectSettings/ProjectVersion.txt`).
+- **Open**: Unity 6000.5.0f1 (see `ProjectSettings/ProjectVersion.txt`).
 - **Play**: `Assets/_Project/Scenes/Bootstrap.unity` → Play. `[Bootstrap] Step N/M: ...` lines appear in Console.
 - **Tests**: `Window → General → Test Runner` (EditMode + PlayMode).
 - **Headless** (Editor must be closed first):

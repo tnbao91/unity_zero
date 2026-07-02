@@ -23,16 +23,16 @@ namespace Zero.Core
 
 | Member | Behavior |
 |---|---|
-| `RegisterPlacement` | Declares a placement: its `AdType`, minimum `cooldown` between shows, and per-session show `sessionCap`. Re-registering resets that placement's counters. |
-| `CanShow` | **Fail-safe** predicate — returns `false` for an unregistered placement, one that's capped, still in cooldown, or whose `AdType` isn't ready on `IAdsService`. |
-| `TryShowAsync` | Re-checks `CanShow`, then calls `IAdsService.ShowAsync`. On a `Shown`/`Rewarded` result it bumps the placement's last-shown time and session count. Returns the `AdShowResult` (`NotReady`/`Failed` carry a reason). Never throws on an unknown placement — returns a `Failed`/`NotReady` result. |
-| `NotifyShown` | Manually records a show (last-shown time + session count) for cases where the ad was shown outside `TryShowAsync`. |
+| `RegisterPlacement` | Declares a placement: its `AdType`, minimum `cooldown` between shows, and per-session show `sessionCap`. Re-registering resets that placement's counters. **Write method — throws** on invalid input: `ArgumentNullException`/`ArgumentException` for a null/empty id, `ArgumentOutOfRangeException` for `sessionCap < 1` or a negative `cooldown`. |
+| `CanShow` | **Fail-safe** predicate — returns `false` for a null/empty id, an unregistered placement, one that's capped, still in cooldown, or whose `AdType` isn't ready on `IAdsService`. |
+| `TryShowAsync` | Re-checks `CanShow`, then calls `IAdsService.ShowAsync`. On a `Shown`/`Rewarded` result it bumps the placement's last-shown time and session count. Returns the `AdShowResult` (`NotReady`/`Failed` carry a reason). Never throws on a null/empty/unknown placement id — returns a `Failed`/`NotReady` result. |
+| `NotifyShown` | Manually records a show (last-shown time + session count) for cases where the ad was shown outside `TryShowAsync`. Safe no-op for a null/empty/unregistered id. |
 
 Cooldown uses `Time.realtimeSinceStartup`; counters are in-memory and reset each process launch (hence *session* cap).
 
 ## Extension Points
 
-The impl is `sealed`. Swap the binding in `AdPlacementServiceInstaller.cs` (or your consumer partial) to change the policy — e.g. persisted daily caps, remote-config-driven frequency, or A/B-tested cooldowns:
+The impl is `sealed`. Swap the binding in `AdPlacementServiceInstaller.cs` (or consumer-side: re-register `IAdPlacementService` in your own `ContainerScope.OnRootContainerBuilding` installer — last registration wins) to change the policy — e.g. persisted daily caps, remote-config-driven frequency, or A/B-tested cooldowns:
 
 ```csharp
 builder.RegisterType(

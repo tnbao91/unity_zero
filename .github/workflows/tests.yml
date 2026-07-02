@@ -1,8 +1,16 @@
 name: EditMode Tests
 
+# push is limited to main: PR branches already run via pull_request, and the
+# unrestricted pair double-ran every Unity job (license activation + minutes ×2).
 on:
   push:
+    branches: [main]
   pull_request:
+
+# Supersede in-flight runs of the same ref — only the newest push matters.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 # game-ci/unity-test-runner posts test results as a GitHub Check (uses
 # `checks: write`); it also needs `contents: read` for the checkout. Without
