@@ -33,6 +33,8 @@ namespace Zero.Services.AdPlacement
             if (string.IsNullOrEmpty(placementId))
             {
                 _log.Warn("[ADPLACE] Null or empty placement id");
+                // No placement to read a type from — Interstitial is a filler, same as the
+                // unknown-placement path below. Callers branch on Result, not Type.
                 return new AdShowResult(AdType.Interstitial, AdResult.Failed, placementId, "invalid placement id");
             }
             if (!_placements.TryGetValue(placementId, out var p))

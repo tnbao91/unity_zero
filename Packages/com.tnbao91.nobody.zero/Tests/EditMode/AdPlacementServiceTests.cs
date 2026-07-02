@@ -13,7 +13,9 @@ namespace Zero.Tests.EditMode
     /// <summary>
     /// Boundary guards + gating policy of DefaultAdPlacementService. The null/empty-id
     /// tests anchor the contract documented in docs/services/adplacement.md ("fail-safe
-    /// queries, explicit results"): queries return false / a Failed result, writes throw.
+    /// queries, explicit results"): CanShow/TryShowAsync/NotifyShown fail safe (false /
+    /// Failed result / no-op — NotifyShown deliberately mirrors its silent-ignore of
+    /// unknown ids), while RegisterPlacement, the write, throws.
     /// </summary>
     public class AdPlacementServiceTests
     {
@@ -98,14 +100,15 @@ namespace Zero.Tests.EditMode
             Assert.IsTrue(_service.CanShow("inter"), "re-registering resets counters (documented behavior)");
         }
 
-        [Test]
-        public void NotifyShown_NullPlacementId_IsNoOp()
+        [TestCase(null)]
+        [TestCase("")]
+        public void NotifyShown_NullOrEmptyPlacementId_IsNoOp(string placementId)
         {
             _service.RegisterPlacement("inter", AdType.Interstitial, TimeSpan.Zero, sessionCap: 1);
 
-            _service.NotifyShown(null);
+            _service.NotifyShown(placementId);
 
-            Assert.IsTrue(_service.CanShow("inter"), "null id must not throw nor touch registered placements");
+            Assert.IsTrue(_service.CanShow("inter"), "invalid id must not throw nor touch registered placements");
         }
 
         [Test]
@@ -119,12 +122,15 @@ namespace Zero.Tests.EditMode
         }
 
         [UnityTest]
-        public IEnumerator TryShowAsync_NullPlacementId_ReturnsFailedResult() => UniTask.ToCoroutine(async () =>
+        public IEnumerator TryShowAsync_NullOrEmptyPlacementId_ReturnsFailedResult() => UniTask.ToCoroutine(async () =>
         {
-            var result = await _service.TryShowAsync(null);
+            var forNull = await _service.TryShowAsync(null);
+            var forEmpty = await _service.TryShowAsync("");
 
-            Assert.AreEqual(AdResult.Failed, result.Result);
-            StringAssert.Contains("invalid", result.ErrorMessage);
+            Assert.AreEqual(AdResult.Failed, forNull.Result);
+            Assert.AreEqual(AdResult.Failed, forEmpty.Result);
+            StringAssert.Contains("invalid", forNull.ErrorMessage);
+            StringAssert.Contains("invalid", forEmpty.ErrorMessage);
             Assert.AreEqual(0, _ads.ShowCalls);
         });
 
