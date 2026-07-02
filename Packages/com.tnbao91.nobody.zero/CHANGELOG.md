@@ -4,6 +4,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; per-ph
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-07-02 — AdPlacement boundary guards
+
+### Fixed
+- **`DefaultAdPlacementService` no longer throws on a null placement id.** `CanShow(null)` / `TryShowAsync(null)` / `NotifyShown(null)` crashed with `ArgumentNullException` out of the internal dictionary, contradicting the documented fail-safe contract (`docs/services/adplacement.md`). Queries now fail safe (`false` / `Failed` result / no-op); `RegisterPlacement` validates input (`ArgumentNullException`/`ArgumentException` on null/empty id, `ArgumentOutOfRangeException` on `sessionCap < 1` or negative cooldown).
+
+### Added
+- `AdPlacementServiceTests` (EditMode, 15 methods) — boundary guards + session-cap/cooldown/re-register/unknown-placement semantics. The service previously had no tests.
+
+### Changed
+- Inert `"R3"` entries removed from `Zero.Editor` and both test asmdefs (completes the v0.3.0 round-C sweep; R3 is a NuGetForUnity DLL, not an asmdef).
+- `ConsoleCommandAttribute` is now `sealed`.
+
 ## [0.5.0] — 2026-06-20 — Unity 6.5 upgrade
 
 Minimum Unity version raised to 6000.5.0f1. No change to public API.
