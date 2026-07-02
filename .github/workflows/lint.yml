@@ -1,8 +1,15 @@
 name: Lint
 
+# push is limited to main: PR branches already run via pull_request (the
+# claude-mirror job is PR-only anyway — it diffs against a base ref).
 on:
   push:
+    branches: [main]
   pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
