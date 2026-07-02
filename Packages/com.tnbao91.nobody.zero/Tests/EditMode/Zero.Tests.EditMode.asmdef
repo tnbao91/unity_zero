@@ -6,6 +6,7 @@
         "UnityEditor.TestRunner",
         "Zero.Core",
         "Zero.Infrastructure",
+        "Zero.Services.AdPlacement",
         "Zero.Services.Save",
         "Zero.Services.Pool",
         "Zero.Services.Events",
