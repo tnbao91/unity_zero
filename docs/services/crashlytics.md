@@ -2,7 +2,7 @@
 
 ## Overview
 
-`ICrashlyticsService` reports uncaught exceptions and breadcrumb logs to a crash-tracking backend. The template ships `MockCrashlyticsService` — calls go to `Debug.Log` so you see what *would* be reported. `CrashlyticsStep` is the only **critical** bootstrap step in the pipeline (per `PLAN.md` §2.11) — if the real impl fails to initialize, bootstrap aborts so subsequent steps don't paper over a broken telemetry surface.
+`ICrashlyticsService` reports uncaught exceptions and breadcrumb logs to a crash-tracking backend. The template ships `MockCrashlyticsService` — calls go to `Debug.Log` so you see what *would* be reported. `CrashlyticsStep` runs **first** in the pipeline so later steps' failures are visible to it, but it is not a critical step — if it fails to initialize, bootstrap logs and continues rather than denying the player their session. See Design Rationale below.
 
 Real impls wrap Firebase Crashlytics, Bugsnag, Sentry, or AppsFlyer's crash module.
 
@@ -24,7 +24,7 @@ namespace Zero.Core
 
 ## Mock behavior
 
-`MockCrashlyticsService` (in `Assets/_Project/Scripts/Runtime/Services/Crashlytics/MockCrashlyticsService.cs`) — every call writes to `Debug.Log`/`LogError` with a `[Crashlytics]` prefix. `InitializeAsync` returns `UniTask.CompletedTask` immediately.
+`MockCrashlyticsService` (in `Packages/com.tnbao91.nobody.zero/Runtime/Services/Crashlytics/MockCrashlyticsService.cs`) — every call writes to `Debug.Log`/`LogError` with a `[Crashlytics]` prefix. `InitializeAsync` returns `UniTask.CompletedTask` immediately.
 
 ## Extension Points
 
@@ -104,6 +104,6 @@ private void OnPurchaseFailed(Exception ex, string productId)
 
 ## Design Rationale
 
-- **`CrashlyticsStep` is the only critical step** — telemetry is foundational; if it doesn't init, every subsequent crash is invisible. Other steps are non-critical and degrade to mocks/no-op.
+- **`CrashlyticsStep` runs first but is *not* critical** (`IsCritical => false`) — telemetry is foundational for diagnosis, so it initializes before anything else can throw, but a game that boots without crash reporting is still a game. Failing to init must not cost the player their session. It is also the only step that shortens the 30s default timeout, to 5s: a telemetry SDK that hasn't answered in 5s is not worth stalling the splash screen for. The critical steps — the ones that abort bootstrap — are `DeviceProfileStep`, `AssetStep` and `ConsentStep`.
 - **Mock writes to Debug.Log** rather than no-op so dev work surfaces "what would be sent". A silent mock is hard to verify.
 - **Single `RecordException` overload** rather than separate `RecordHandled` / `RecordFatal` — most SDKs treat the distinction via metadata; keep the interface narrow.

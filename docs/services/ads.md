@@ -36,7 +36,7 @@ namespace Zero.Core
 
 ## Mock behavior
 
-`MockAdsService` (`Assets/_Project/Scripts/Runtime/Services/Ads/MockAdsService.cs`):
+`MockAdsService` (`Packages/com.tnbao91.nobody.zero/Runtime/Services/Ads/MockAdsService.cs`):
 - `IsReady(_)` returns `true` after a brief simulated load.
 - `ShowAsync` returns `Shown` for Banner/Interstitial and `Rewarded` for Rewarded after ~500ms simulated playback.
 - `OnAdEvent` emits the same result.

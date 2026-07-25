@@ -26,7 +26,7 @@ namespace Zero.Core
 
 ## Mock behavior
 
-`MockRemoteConfigService` (`Assets/_Project/Scripts/Runtime/Services/RemoteConfig/MockRemoteConfigService.cs`):
+`MockRemoteConfigService` (`Packages/com.tnbao91.nobody.zero/Runtime/Services/RemoteConfig/MockRemoteConfigService.cs`):
 - All `TryGet*` calls return `false` for any key (empty store).
 - `FetchAndActivateAsync` returns `true` immediately.
 - `GetVariant<T>` returns `defaultValue`.

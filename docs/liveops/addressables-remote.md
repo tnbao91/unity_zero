@@ -62,7 +62,7 @@ Subsequent live-ops drops:
 
 ## Extension Points
 
-**Forcing a catalog refresh.** Default behavior fetches the catalog once per session. To force re-fetch (e.g. after `AppPaused(false)` indicating long background time):
+**Forcing a catalog refresh.** Default behavior fetches the catalog once per session. To force re-fetch (e.g. on app resume after a long time backgrounded — the template ships no app-lifecycle event, so publish your own from `OnApplicationPause`; see `docs/liveops/version-check.md`):
 
 ```csharp
 await Addressables.UpdateCatalogs(autoCleanBundleCache: true).ToUniTask();

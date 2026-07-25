@@ -21,7 +21,7 @@ namespace Zero.Core
 }
 ```
 
-`StubTimeService` implementation (`Assets/_Project/Scripts/Runtime/Services/Time/StubTimeService.cs`):
+`StubTimeService` implementation (`Packages/com.tnbao91.nobody.zero/Runtime/Services/Time/StubTimeService.cs`):
 
 | Member | Stub behavior |
 |---|---|
@@ -32,7 +32,7 @@ namespace Zero.Core
 
 ## Extension Points
 
-Swap the binding in `Assets/_Project/Scripts/Runtime/Services/Time/TimeServiceInstaller.cs`:
+Swap the binding in `Packages/com.tnbao91.nobody.zero/Runtime/Services/Time/TimeServiceInstaller.cs`:
 
 ```csharp
 builder.RegisterType(
@@ -46,7 +46,7 @@ A real impl typically:
 1. Calls a backend endpoint (`GET /now`) on `SyncAsync` and stores the offset between server time and `DateTime.UtcNow`.
 2. Returns `_serverNowAtSync + (DateTime.UtcNow - _localNowAtSync)` from `UtcNow`.
 3. Sets `IsServerSynced = true` after the first successful sync.
-4. Re-syncs periodically (e.g. every 30 minutes, or on app foreground via `AppPaused` event from the bus).
+4. Re-syncs periodically (e.g. every 30 minutes, or on app foreground — the template ships no app-lifecycle event, so publish your own from `OnApplicationPause`; see `docs/liveops/version-check.md`).
 
 If an NTP-only impl is acceptable (no server), use `Cysharp.Threading.Tasks.UniTask` to wrap a UDP NTP query — but be aware NTP UDP is blocked by some carrier networks; fallback to local time with a warn.
 

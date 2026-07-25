@@ -2,11 +2,11 @@
 
 ## Overview
 
-EditMode tests run in the Unity Editor without starting Play Mode. They verify logic without needing a loaded scene, rendering, or Input System. All tests in `Assets/_Project/Scripts/Tests/EditMode/` are gated by the `UNITY_INCLUDE_TESTS` define and only compile in the Editor.
+EditMode tests run in the Unity Editor without starting Play Mode. They verify logic without needing a loaded scene, rendering, or Input System. All tests in `Packages/com.tnbao91.nobody.zero/Tests/EditMode/` are gated by the `UNITY_INCLUDE_TESTS` define and only compile in the Editor.
 
 ## Test Setup
 
-**Asmdef:** `Assets/_Project/Scripts/Tests/EditMode/Zero.Tests.EditMode.asmdef` references:
+**Asmdef:** `Packages/com.tnbao91.nobody.zero/Tests/EditMode/Zero.Tests.EditMode.asmdef` references:
 - `UnityEngine.TestRunner` (test runner infrastructure)
 - `UnityEditor.TestRunner` (editor-specific test utilities)
 - `Zero.Core`, `Zero.Infrastructure` (interfaces and base classes)

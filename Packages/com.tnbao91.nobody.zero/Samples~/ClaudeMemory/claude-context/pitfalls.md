@@ -6,7 +6,7 @@ Subset of upstream `docs/dev/PITFALLS.md` filtered to footguns consumers will hi
 
 ### `ZeroSecrets.asset` must be configured
 - File: `Assets/Resources/ZeroSecrets.asset` (rename + move from imported sample).
-- Inspector: replace `REPLACE_ME_*` placeholders with random per-game strings.
+- Inspector: replace both `REPLACE_BEFORE_SHIPPING` placeholders (`_aesSeed`, `_hmacSeed`) with random per-game strings.
 - Player builds throw `InvalidOperationException` at startup if missing or unconfigured.
 - Editor builds warn loud but continue (so iteration isn't blocked).
 - Gitignored — these are per-game secrets.

@@ -9,7 +9,7 @@
 This document is the read-only authoritative diagram of the asmdef DAG. To verify, run:
 
 ```bash
-find Assets/_Project/Scripts/Runtime -name "*.asmdef" | xargs -n1 -I{} sh -c 'echo "==> {}"; cat "{}"'
+find Packages/com.tnbao91.nobody.zero/Runtime -name "*.asmdef" | xargs -n1 -I{} sh -c 'echo "==> {}"; cat "{}"'
 ```
 
 The graph below is built from the `references` field of each `.asmdef`.
@@ -103,7 +103,7 @@ The graph above is illustrative — only key edges shown for readability. Every 
 
 References: `UniTask`. No project-internal asmdef references. (R3 types appear in interface signatures, but R3 is a NuGetForUnity DLL — auto-included with `overrideReferences:false`; the inert `"R3"` entries were removed from `references[]` in v0.3.0.)
 
-Holds: every `I*Service` interface, cross-cutting event POCOs (`AppPaused`, `AppQuitting`), `IBootstrapStep`, `IBootstrapProgressReporter`. No implementations.
+Holds: every `I*Service` interface, cross-cutting event POCOs (`Core/Events/` — `BootstrapFailed`, `BootstrapRetryRequested`, `PopupOpened`, `PopupClosed`, `PopupBackdropTapped`), `IBootstrapStep`, `IBootstrapProgressReporter`. No implementations. Note there is **no app-lifecycle event** (`AppPaused` / `AppQuitting`) — those were planned but never shipped; define your own in your game assembly.
 
 ### Tier 2 — `Zero.Infrastructure`
 
@@ -124,7 +124,8 @@ Other services do not depend on the bus directly — they expose their own R3 ob
 
 ### Tier 4 — Peers
 
-- `Zero.UI` — references `Zero.Core`, `Zero.Infrastructure`, `Zero.Services.Events`, plus `Zero.Services.Asset` (for popup/screen/toast prefab loading) and `Zero.Services.Localization` (for `LocalizedText`). Plus `LitMotion`, `Unity.TextMeshPro`, `Unity.Addressables`.
+- `Zero.UI` — references `Zero.Core`, `Zero.Infrastructure`, `Zero.Services.Events`, `Zero.Services.Localization`, `UniTask`, `Reflex`, `LitMotion`, `LitMotion.Extensions`, `Unity.TextMeshPro`, `Unity.Addressables`.
+  - **`Zero.UI` loads prefabs through `Unity.Addressables` directly, not through `IAssetService`.** It has no `Zero.Services.Asset` reference. This is the one place in the template that bypasses the "nothing calls Addressables directly" rule stated in `docs/services/asset.md` — `UIService`, `ScreenManager` and `ToastQueue` each own their handle lifetime instead. Worth knowing before you go looking for the `IAssetService` call that isn't there.
 - `Zero.Meta` — empty placeholder. References: `Zero.Core`, `Zero.Infrastructure`, `Zero.Services.Events`. No impl ships; consumer fills.
 - `Zero.Gameplay` — references `Zero.Core`, `Zero.Infrastructure`, `Zero.Services.Events`, `UniTask`, `Reflex`, `LitMotion`. **Does NOT reference `Zero.UI` or `Zero.Meta`** — peer rule. Verify with `grep "Zero.UI\|Zero.Meta" Packages/com.tnbao91.nobody.zero/Runtime/Gameplay/Zero.Gameplay.asmdef` (must return empty).
 
@@ -145,7 +146,7 @@ Other services do not depend on the bus directly — they expose their own R3 ob
 
 When adding a new service:
 
-1. New asmdef under `Assets/_Project/Scripts/Runtime/Services/<Name>/Zero.Services.<Name>.asmdef`.
+1. New asmdef under `Packages/com.tnbao91.nobody.zero/Runtime/Services/<Name>/Zero.Services.<Name>.asmdef`.
 2. References listed by **string name**, not GUID. Mirror an existing asmdef.
 3. `autoReferenced: false`.
 4. Add the new asmdef to `Zero.Bootstrap.asmdef.references` so the composition root can wire it.

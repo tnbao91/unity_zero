@@ -91,22 +91,48 @@ public sealed class LiveOpsGate : MonoBehaviour
 
 `IVersionCheckService.CheckAsync` re-runs the gate. Common triggers:
 
-- **App foreground.** Bus event `AppPaused(false)` (resumed) — re-check; remote config may have flipped `maintenance_mode` while the user was away.
+- **App foreground.** Re-check on resume; remote config may have flipped `maintenance_mode` while the user was away.
 - **After purchase / deeplink.** Premium / live-event flows that depend on a recent server state.
 - **Manual retry.** From the maintenance popup's "Try again" button.
+
+> **The template ships no app-lifecycle event.** There is no `AppPaused` type in `Zero.Core` — the only events that ship are `BootstrapFailed`, `BootstrapRetryRequested`, the three `Popup*` events and the five `Level*` events. Define your own POCO and publish it from `OnApplicationPause`:
+
+```csharp
+// Your game assembly
+public readonly struct AppPaused
+{
+    public readonly bool IsPaused;
+    public AppPaused(bool isPaused) => IsPaused = isPaused;
+}
+
+public sealed class AppLifecyclePublisher : MonoBehaviour
+{
+    [Inject] private IEventBus _bus;
+
+    private void OnApplicationPause(bool paused) => _bus.Publish(new AppPaused(paused));
+}
+```
+
+Then subscribe wherever you need the re-check:
 
 ```csharp
 [Inject] private IVersionCheckService _versionCheck;
 [Inject] private IEventBus _bus;
 
+private IDisposable _sub;
+
 private void Awake()
 {
-    _bus.On<AppPaused>().Where(e => !e.IsPaused).Subscribe(async _ =>
-    {
-        var result = await _versionCheck.CheckAsync();
-        if (result.Status == VersionStatus.Maintenance)
-            ShowMaintenanceLockout();
-    });
+    _sub = _bus.On<AppPaused>().Where(e => !e.IsPaused).Subscribe(_ => Recheck().Forget());
+}
+
+private void OnDestroy() => _sub?.Dispose();
+
+private async UniTask Recheck()
+{
+    var result = await _versionCheck.CheckAsync();
+    if (result.Status == VersionStatus.Maintenance)
+        ShowMaintenanceLockout();
 }
 ```
 

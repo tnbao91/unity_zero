@@ -27,7 +27,7 @@ namespace Zero.Core
 
 ## Mock behavior
 
-`MockConsentService` (`Assets/_Project/Scripts/Runtime/Services/Consent/MockConsentService.cs`):
+`MockConsentService` (`Packages/com.tnbao91.nobody.zero/Runtime/Services/Consent/MockConsentService.cs`):
 - `GdprStatus` returns `Personalized` after `RequestGdprAsync` is called once.
 - `AttStatus` returns `Authorized` after `RequestAttAsync`.
 - `OnConsentChanged` emits when status changes.

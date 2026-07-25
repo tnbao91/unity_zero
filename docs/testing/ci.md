@@ -92,12 +92,12 @@ Then rerun the above.
 
 ## Extending CI
 
-**Add PlayMode tests:** create test suites in `Assets/_Project/Scripts/Tests/PlayMode/` and add a second test-runner step in `.github/workflows/tests.yml`:
+**Add PlayMode tests:** create test suites in `Packages/com.tnbao91.nobody.zero/Tests/PlayMode/` and add a second test-runner step in `.github/workflows/tests.yml`:
 ```yaml
 - uses: game-ci/unity-test-runner@v4
   with:
     projectPath: .
-    unityVersion: 6000.3.11f1
+    unityVersion: 6000.5.5f1  # must match ProjectSettings/ProjectVersion.txt — the job's first step fails CI if it drifts
     testMode: playmode
     artifactsPath: artifacts-playmode
     githubToken: ${{ secrets.GITHUB_TOKEN }}

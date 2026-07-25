@@ -92,7 +92,7 @@ Author game states (the template ships none). `IGameState.EnterAsync / ExitAsync
 ### Configure ZeroSecrets
 
 1. Copy `ZeroSecrets.asset.example` → `ZeroSecrets.asset` under `Assets/Resources/`.
-2. Replace `REPLACE_ME_*` placeholder strings with random per-game secrets (32+ char each).
+2. Replace both `REPLACE_BEFORE_SHIPPING` placeholder strings (`_aesSeed`, `_hmacSeed`) with random per-game secrets (32+ char each).
 3. File is gitignored — store the values in your team's secret manager.
 4. Player build fails fast at startup if missing/unconfigured. Editor builds warn loud but continue.
 
