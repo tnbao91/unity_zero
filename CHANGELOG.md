@@ -4,6 +4,10 @@ All notable template-level changes are recorded here. Format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Changed
+- **Host project editor: `6000.5.0f1` → `6000.5.5f1`** (patch LTS). `ProjectSettings/ProjectVersion.txt`, the CI image (`tests.yml` `unityVersion`), the README badge + clone step and `CLAUDE.md` all move together. `ProjectSettings/EditorBuildSettings.asset` drops `m_UseUCBPForAssetBundles` — written by the editor upgrade, not by hand. The package's `"unity": "6000.5"` minimum is unchanged; consumers on any 6000.5.x are unaffected.
+- Host project `com.unity.purchasing` `5.3.1` → `5.4.2` (pulls `com.unity.services.core` `1.14.0` → `1.18.0`). The package's own dependency floor stays at `5.3.1` — it is a minimum, and raising it would force consumers up for no reason.
+
 ## [0.5.2] — 2026-07-26 — GUID collision with Addressables 3.0.0
 
 ### Fixed
