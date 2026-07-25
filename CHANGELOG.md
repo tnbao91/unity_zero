@@ -4,6 +4,11 @@ All notable template-level changes are recorded here. Format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-07-26 — GUID collision with Addressables 3.0.0
+
+### Fixed
+- Hand-authored `.meta` GUIDs in `Runtime/UI/` collided with `com.unity.addressables` 3.0.0, dropping `PopupHandle.cs` from the AssetDatabase and breaking `Zero.UI` compilation (`CS0246`) in any consumer project on Addressables 3.x. `PopupHandle.cs.meta` and `LocalizedText.cs.meta` GUIDs regenerated.
+
 ## [0.5.1] — 2026-07-02 — Full-project review fixes
 
 ### Fixed
