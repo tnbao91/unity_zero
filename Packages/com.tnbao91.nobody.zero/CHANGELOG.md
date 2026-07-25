@@ -4,6 +4,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; per-ph
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-07-26 — GUID collision with Addressables 3.0.0
+
+### Fixed
+- **`Zero.UI` failed to compile in any project also using `com.unity.addressables` 3.0.0.** `Runtime/UI/PopupHandle.cs.meta` shipped a hand-authored GUID (`c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7`) that is byte-identical to the one in Addressables 3.0.0's `Tests/Editor/ProjectConfigDataSerializationTests.cs.meta`. Unity resolved the conflict by dropping `PopupHandle.cs` from the AssetDatabase, so `PopupBase.cs` and `UIService.cs` failed with `CS0246: PopupHandle<> / IPopupHandle could not be found` — a hard compile error blocking the whole Editor. GUID regenerated. (Addressables 2.3.1 and earlier do not contain that test file, which is why this only surfaced on the 3.0.0 upgrade.)
+- `Runtime/UI/LocalizedText.cs.meta` carried a second hand-authored GUID (`f1a2b3c4…`) with the same collision risk; also regenerated. No asset in the package or in consumer projects referenced either GUID, so no prefab/scene rewiring was needed.
+
 ## [0.5.1] — 2026-07-02 — AdPlacement boundary guards
 
 ### Fixed

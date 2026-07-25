@@ -154,7 +154,20 @@ Unity's Test Runner only enumerates EditMode test asmdefs that have `includePlat
 
 ### Pre-commit `.cs.meta` for assets that reference scripts
 
-`Assets/Resources/ZeroSecrets.asset.example` references `ZeroSecrets.cs` by GUID. If `ZeroSecrets.cs.meta` isn't tracked in git, Unity generates a fresh random GUID on first import and the example asset's script reference dangles. The repo pre-commits `ZeroSecrets.cs.meta` with a deterministic GUID. Apply the same pattern any time you ship a sample/template `.asset` that binds to a script.
+`Assets/Resources/ZeroSecrets.asset.example` references `ZeroSecrets.cs` by GUID. If `ZeroSecrets.cs.meta` isn't tracked in git, Unity generates a fresh random GUID on first import and the example asset's script reference dangles. The repo pre-commits `ZeroSecrets.cs.meta` with a fixed GUID. Apply the same pattern any time you ship a sample/template `.asset` that binds to a script.
+
+"Fixed" means *let Unity generate it once, then track the file*. Never type the GUID yourself — see the next entry.
+
+### Never hand-author a `.meta` GUID
+
+Let Unity generate every GUID. A hand-typed one looks tidy (`c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7`, `f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6`) — and that's exactly the problem: every other author reaching for a tidy pattern lands on the same handful of strings.
+
+Real case (v0.5.2). `Runtime/UI/PopupHandle.cs.meta` shipped `c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7`, byte-identical to the GUID in `com.unity.addressables@3.0.0/Tests/Editor/ProjectConfigDataSerializationTests.cs.meta`. Unity resolved the collision by **dropping `PopupHandle.cs` from the AssetDatabase** — the file sat on disk, correct and unmodified, while `PopupBase.cs` and `UIService.cs` failed with `CS0246: PopupHandle<> / IPopupHandle could not be found`. The whole Editor was blocked by a compile error whose cause is invisible at the point of failure.
+
+Note the failure mode: **a phantom missing type, not a GUID error.** Nothing in the Console mentions GUIDs; only `Logs/Editor.log` states the conflict. If a type vanishes from a file that plainly defines it, grep the package's `.meta` GUIDs against `Library/PackageCache/` before suspecting the asmdef.
+
+Only the consumer's package set decides whether a collision fires — Addressables 2.3.1 has no such test file, so this stayed dormant until a consumer upgraded to 3.0.0. A package that "works here" proves nothing.
+
 
 ### Reflex root container access — use `Container.RootContainer`, not `ContainerScope.Root`
 

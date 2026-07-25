@@ -6,7 +6,7 @@ Guidance for Claude Code (claude.ai/code) when working in this repo.
 
 ## Project
 
-Unity 6 LTS (`6000.5.0f1`) greenfield template for hybrid casual games. Single bootstrap scene at `Assets/_Project/Scenes/Bootstrap.unity`. URP, new Input System, Addressables, IAP, NuGetForUnity. Runtime code lives in `Packages/com.tnbao91.nobody.zero/Runtime/` (the package); `Assets/_Project/` is the consumer-side host project.
+Unity 6 LTS (`6000.5.5f1`) greenfield template for hybrid casual games. Single bootstrap scene at `Assets/_Project/Scenes/Bootstrap.unity`. URP, new Input System, Addressables, IAP, NuGetForUnity. Runtime code lives in `Packages/com.tnbao91.nobody.zero/Runtime/` (the package); `Assets/_Project/` is the consumer-side host project.
 
 ## Stack (locked — do not substitute)
 
@@ -77,7 +77,7 @@ Substitution suggestions are rejected on sight. The user picked these deliberate
 
 This is a Unity project — no shell-level build script. Verify changes inside the Editor:
 
-- **Open**: Unity 6000.5.0f1 (see `ProjectSettings/ProjectVersion.txt`).
+- **Open**: Unity 6000.5.5f1 (see `ProjectSettings/ProjectVersion.txt`).
 - **Play**: `Assets/_Project/Scenes/Bootstrap.unity` → Play. `[Bootstrap] Step N/M: ...` lines appear in Console.
 - **Tests**: `Window → General → Test Runner` (EditMode + PlayMode).
 - **Headless** (Editor must be closed first):

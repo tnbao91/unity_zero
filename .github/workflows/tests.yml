@@ -59,7 +59,7 @@ jobs:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
         with:
           projectPath: .
-          unityVersion: 6000.5.0f1
+          unityVersion: 6000.5.5f1
           testMode: editmode
           artifactsPath: artifacts
           githubToken: ${{ secrets.GITHUB_TOKEN }}
