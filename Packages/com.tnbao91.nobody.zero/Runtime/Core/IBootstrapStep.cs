@@ -32,6 +32,10 @@ namespace Zero.Core
         // Blocking steps delay the player; deferred steps do not. Defaults to Blocking in
         // BootstrapStepBase so an existing consumer step keeps its current semantics rather
         // than silently sliding off the boot path.
+        //
+        // Added in 0.7.0. Deriving BootstrapStepBase — the documented way to write a step —
+        // picks up the default and needs no change. Implementing this interface directly is
+        // source-breaking: add `public BootstrapPhase Phase => BootstrapPhase.Deferred;`.
         BootstrapPhase Phase { get; }
 
         // Per-step deadline; pipeline cancels with linked CTS if breached.

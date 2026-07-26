@@ -24,7 +24,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; per-ph
 - **`EncryptedJsonSaveService` threw from its constructor.** In a player build with a missing or placeholder `ZeroSecrets.asset`, `LoadSeeds` threw during Reflex container resolve — before step 1, outside the pipeline — surfacing as an opaque resolve failure with no `BootstrapFailed`, no degradation and no pipeline log. Seed derivation now happens on first use, inside `SaveStep`, where it is reported like any other step failure. Same exception, same message, same fatality.
 
 ### Migration
-Consumer steps keep working unchanged — `Phase` defaults to `Blocking`, which is the old behaviour. **Review your own steps and set `Phase => BootstrapPhase.Deferred` on everything the first screen does not need**; that is where the boot-time win is.
+**If your step derives from `BootstrapStepBase`** (the documented way) it keeps compiling and behaving exactly as before — `Phase` defaults to `Blocking`, which is the old semantics.
+
+**If your step implements `IBootstrapStep` directly, it will not compile.** Adding `Phase` to the interface is a source-breaking change for direct implementers; you get `CS0535: does not implement interface member 'IBootstrapStep.Phase'`. Add one line:
+
+```csharp
+public BootstrapPhase Phase => BootstrapPhase.Deferred;   // or Blocking to keep old behaviour
+```
+
+Then **review every step you own and set `Phase => BootstrapPhase.Deferred` on everything the first screen does not need** — that is where the boot-time win actually is. Adding a step to the blocking phase is a decision to make the player wait for it.
 
 To hand off to your game, subscribe `BootstrapReady` instead of guessing when the pipeline is done:
 
