@@ -19,6 +19,24 @@ namespace Zero.Core.Events
         }
     }
 
+    // Published on IEventBus when the blocking phase finishes — the moment the player may
+    // be shown the game. Deferred steps are still running when this fires, by design; that
+    // is the point. Subscribe from your first scene to load the home screen.
+    //
+    // It fires even if a blocking step failed or the blocking budget expired: bootstrap
+    // never denies the player the game. Ask IBootstrapReport what came up degraded.
+    public readonly struct BootstrapReady
+    {
+        // Wall-clock milliseconds spent in the blocking phase. Watch this number — it is
+        // the one the player actually feels.
+        public readonly double BlockingMs;
+
+        public BootstrapReady(double blockingMs)
+        {
+            BlockingMs = blockingMs;
+        }
+    }
+
     // Published on IEventBus when a non-critical step exhausts its retries. The
     // pipeline continues and the player still reaches the game — this event exists
     // so "continue degraded" is an observable decision rather than a silent one.

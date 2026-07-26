@@ -9,6 +9,10 @@ namespace Zero.Bootstrap.Steps
     public sealed class IapStep : BootstrapStepBase
     {
         public override string Name => "IAP";
+
+        // Deferred: A store catalog fetch takes seconds and fails outright offline. Gate the shop
+        // on IIAPService.IsInitialized instead of gating the game on this.
+        public override BootstrapPhase Phase => BootstrapPhase.Deferred;
         public override bool IsCritical => false;
 
         private static readonly string[] DefaultProductIds =

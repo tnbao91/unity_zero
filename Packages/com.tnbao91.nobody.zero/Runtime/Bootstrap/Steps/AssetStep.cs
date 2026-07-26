@@ -10,6 +10,10 @@ namespace Zero.Bootstrap.Steps
     {
         public override string Name => "Asset";
 
+        // Blocking — the first screen is content. Addressables is believed to self-initialize on
+        // first use, but blocking here means first paint does not depend on that being true.
+        public override BootstrapPhase Phase => BootstrapPhase.Blocking;
+
         // The most arguable non-critical step in the pipeline. If Addressables fails to
         // initialize, nothing content-driven will load — so blocking here is defensible.
         // It is still wrong for this template: aborting leaves the player on a splash

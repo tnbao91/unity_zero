@@ -9,6 +9,9 @@ namespace Zero.Bootstrap.Steps
     public sealed class TimeStep : BootstrapStepBase
     {
         public override string Name => "Time";
+
+        // Deferred: A server/NTP round trip. Gate time-sensitive features on ITimeService.IsServerSynced.
+        public override BootstrapPhase Phase => BootstrapPhase.Deferred;
         public override bool IsCritical => false;
 
         private readonly ITimeService _service;

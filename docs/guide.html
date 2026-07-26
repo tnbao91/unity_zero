@@ -197,7 +197,7 @@
 
   <rect class="svg-box" x="572" y="34" width="146" height="52" rx="6"/>
   <text class="svg-label" x="584" y="56">BootstrapPipeline</text>
-  <text class="svg-sub" x="584" y="72">16 steps, async</text>
+  <text class="svg-sub" x="584" y="72">4 blocking, 12 deferred</text>
 
   <rect class="svg-box" x="192" y="120" width="150" height="46" rx="6"/>
   <text class="svg-sub" x="204" y="140">consumer installers</text>
@@ -219,48 +219,104 @@
 </figcaption>
 </figure>
 
-<h3>The 16 steps</h3>
+<figure>
+<svg viewBox="0 0 720 150" role="img" aria-label="Boot timeline: four blocking steps run under a five second budget, then BootstrapReady fires and the player enters the game while twelve deferred steps continue in the background.">
+  <text class="svg-sub" x="2" y="16">BLOCKING — the player is on the splash screen</text>
+  <rect class="svg-box-crit" x="2" y="24" width="250" height="38" rx="6"/>
+  <text class="svg-label" x="14" y="42">Log · DeviceProfile</text>
+  <text class="svg-label" x="14" y="56">Save · Asset</text>
+  <text class="svg-sub" x="150" y="49">≤ 5s budget</text>
+
+  <line class="svg-line" x1="262" y1="14" x2="262" y2="140" stroke-dasharray="3 3"/>
+  <text class="svg-label" x="270" y="26" style="fill: var(--ok)">BootstrapReady</text>
+  <text class="svg-sub" x="270" y="40">the player is in the game from here</text>
+
+  <text class="svg-sub" x="270" y="70">DEFERRED — nobody is waiting</text>
+  <rect class="svg-box" x="270" y="78" width="448" height="38" rx="6"/>
+  <text class="svg-label" x="282" y="96">Crashlytics · Consent · RemoteConfig · Analytics · Localization</text>
+  <text class="svg-label" x="282" y="110">Attribution · Ads · IAP · Audio · Time · Notification · VersionCheck</text>
+
+  <text class="svg-sub" x="2" y="96">progress bar</text>
+  <text class="svg-sub" x="2" y="110">reaches 1.0 here →</text>
+</svg>
+<figcaption>
+  Both phases run sequentially; only the first one costs the player anything. A failed step in either phase is
+  recorded in <code>IBootstrapReport</code> and announced as <code>BootstrapStepDegraded</code> — the pipeline
+  never stops.
+</figcaption>
+</figure>
+
+<h3>The 16 steps, and which four you wait for</h3>
 
 <p>
-  Order is the literal <code>defaultSteps</code> array in <code class="src">ProjectScopeInstaller.cs:125-143</code>.
-  Names are the <code>Name</code> property on each step — you need the exact string to anchor your own step against one.
+  Order is the literal <code>defaultSteps</code> array in <code class="src">ProjectScopeInstaller.cs</code>;
+  names are each step's <code>Name</code> property — you need the exact string to anchor your own step against one.
+  <strong>Phase</strong> is what decides whether the player waits.
 </p>
 
 <div class="scroll">
 <table>
   <thead>
-    <tr><th>#</th><th>Step</th><th><code>Name</code></th><th>Critical</th><th>Timeout</th><th>Why here</th></tr>
+    <tr><th>#</th><th>Step</th><th><code>Name</code></th><th>Phase</th><th>Timeout</th><th>Why</th></tr>
   </thead>
   <tbody>
-    <tr><td>1</td><td><code>CrashlyticsStep</code></td><td><code>"Crashlytics"</code></td><td><span class="tag">no</span></td><td><strong>5s</strong></td><td>First so it can observe every later failure. Not critical — a game that boots without crash reporting is still a game.</td></tr>
-    <tr><td>2</td><td><code>LogStep</code></td><td><code>"Log"</code></td><td><span class="tag">no</span></td><td>30s</td><td>Later steps can log.</td></tr>
-    <tr><td>3</td><td><code>DeviceProfileStep</code></td><td><code>"DeviceProfile"</code></td><td><span class="tag">no</span></td><td>30s</td><td>Gates the quality tier everything after it reads. Failure = Unity's default quality.</td></tr>
-    <tr><td>4</td><td><code>SaveStep</code></td><td><code>"Save"</code></td><td><span class="tag">no</span></td><td>30s</td><td>Moved up so later steps can read persisted settings (volume, locale, consent).</td></tr>
-    <tr><td>5</td><td><code>AssetStep</code></td><td><code>"Asset"</code></td><td><span class="tag">no</span></td><td>30s</td><td>Retried <strong>3×</strong> — the one worth retrying. Degrades rather than blocks; gate content on the report.</td></tr>
-    <tr><td>6</td><td><code>ConsentStep</code></td><td><code>"Consent"</code></td><td><span class="tag">no</span></td><td>30s</td><td>Failure must fall back to non-personalized, not to a blocked launch.</td></tr>
-    <tr><td>7</td><td><code>RemoteConfigStep</code></td><td><code>"RemoteConfig"</code></td><td><span class="tag">no</span></td><td>30s</td><td></td></tr>
-    <tr><td>8</td><td><code>AnalyticsStep</code></td><td><code>"Analytics"</code></td><td><span class="tag">no</span></td><td>30s</td><td></td></tr>
-    <tr><td>9</td><td><code>LocalizationStep</code></td><td><code>"Localization"</code></td><td><span class="tag">no</span></td><td>30s</td><td>UI text ready before anything surfaces a localized error.</td></tr>
-    <tr><td>10</td><td><code>AttributionStep</code></td><td><code>"Attribution"</code></td><td><span class="tag">no</span></td><td>30s</td><td></td></tr>
-    <tr><td>11</td><td><code>AdsStep</code></td><td><code>"Ads"</code></td><td><span class="tag">no</span></td><td>30s</td><td></td></tr>
-    <tr><td>12</td><td><code>IapStep</code></td><td><code>"IAP"</code></td><td><span class="tag">no</span></td><td>30s</td><td></td></tr>
-    <tr><td>13</td><td><code>AudioStep</code></td><td><code>"Audio"</code></td><td><span class="tag">no</span></td><td>30s</td><td></td></tr>
-    <tr><td>14</td><td><code>TimeStep</code></td><td><code>"Time"</code></td><td><span class="tag">no</span></td><td>30s</td><td></td></tr>
-    <tr><td>15</td><td><code>NotificationStep</code></td><td><code>"Notification"</code></td><td><span class="tag">no</span></td><td>30s</td><td></td></tr>
-    <tr><td>16</td><td><code>VersionCheckStep</code></td><td><code>"VersionCheck"</code></td><td><span class="tag">no</span></td><td>30s</td><td></td></tr>
+    <tr><td>1</td><td><code>LogStep</code></td><td><code>"Log"</code></td><td><span class="tag tag-real">blocking</span></td><td>10s</td><td>A no-op that writes one line. Kept only because step names are public API.</td></tr>
+    <tr><td>2</td><td><code>DeviceProfileStep</code></td><td><code>"DeviceProfile"</code></td><td><span class="tag tag-real">blocking</span></td><td>10s</td><td>Synchronous and free, and <code>targetFrameRate</code> wants to be set before the first frames.</td></tr>
+    <tr><td>3</td><td><code>SaveStep</code></td><td><code>"Save"</code></td><td><span class="tag tag-real">blocking</span></td><td>10s</td><td>The first screen shows coins and progress. Also the only step others depend on.</td></tr>
+    <tr><td>4</td><td><code>AssetStep</code></td><td><code>"Asset"</code></td><td><span class="tag tag-real">blocking</span></td><td>10s, 3 attempts</td><td>The first screen is content. Retried most, because a catalog fetch is the failure worth retrying.</td></tr>
+    <tr><td>5</td><td><code>CrashlyticsStep</code></td><td><code>"Crashlytics"</code></td><td><span class="tag">deferred</span></td><td><strong>5s</strong></td><td>First of the deferred set, so it is up before most things can break.</td></tr>
+    <tr><td>6</td><td><code>ConsentStep</code></td><td><code>"Consent"</code></td><td><span class="tag">deferred</span></td><td><strong>none</strong></td><td>Real consent shows a modal dialog to a human. No deadline; see below.</td></tr>
+    <tr><td>7</td><td><code>RemoteConfigStep</code></td><td><code>"RemoteConfig"</code></td><td><span class="tag">deferred</span></td><td>10s</td><td>Defaults are readable before the fetch lands; subscribe <code>OnConfigUpdated</code>.</td></tr>
+    <tr><td>8</td><td><code>AnalyticsStep</code></td><td><code>"Analytics"</code></td><td><span class="tag">deferred</span></td><td>10s</td><td>Real SDKs buffer events before init.</td></tr>
+    <tr><td>9</td><td><code>LocalizationStep</code></td><td><code>"Localization"</code></td><td><span class="tag">deferred</span></td><td>10s</td><td>Worst case is a brief flash of raw keys; <code>LocalizedText</code> re-renders on locale change.</td></tr>
+    <tr><td>10</td><td><code>AttributionStep</code></td><td><code>"Attribution"</code></td><td><span class="tag">deferred</span></td><td>10s</td><td>Needs the event within the session, not before frame 1.</td></tr>
+    <tr><td>11</td><td><code>AdsStep</code></td><td><code>"Ads"</code></td><td><span class="tag">deferred</span></td><td>10s</td><td>Mediation init takes 1-5s and fans out to a dozen adapters. Nothing shows an ad on the first screen.</td></tr>
+    <tr><td>12</td><td><code>IapStep</code></td><td><code>"IAP"</code></td><td><span class="tag">deferred</span></td><td>10s</td><td>A store catalog fetch takes seconds and fails offline. Gate the shop, not the game.</td></tr>
+    <tr><td>13</td><td><code>AudioStep</code></td><td><code>"Audio"</code></td><td><span class="tag">deferred</span></td><td>10s</td><td>Loads the mixer via Addressables. Depends on Save, which is blocking.</td></tr>
+    <tr><td>14</td><td><code>TimeStep</code></td><td><code>"Time"</code></td><td><span class="tag">deferred</span></td><td>10s</td><td>A server/NTP round trip. Gate on <code>ITimeService.IsServerSynced</code>.</td></tr>
+    <tr><td>15</td><td><code>NotificationStep</code></td><td><code>"Notification"</code></td><td><span class="tag">deferred</span></td><td>10s</td><td>Nothing schedules a notification at boot. Depends on Save.</td></tr>
+    <tr><td>16</td><td><code>VersionCheckStep</code></td><td><code>"VersionCheck"</code></td><td><span class="tag">deferred</span></td><td>10s</td><td>Runs after RemoteConfig, which the sequential deferred phase preserves.</td></tr>
   </tbody>
 </table>
 </div>
 
 <div class="note">
-  <p><strong>No shipped step is critical, and that is the design.</strong> Bootstrap never denies the player the
-  game: a step that fails degrades a feature, and the pipeline runs on.</p>
-  <p>This is a deliberate reversal — <code>DeviceProfile</code>, <code>Asset</code> and <code>Consent</code> were
-  critical until 0.6.0. The reason is below: an abort has nowhere good to land. A test pins the rule
-  (<code class="src">BootstrapDegradationTests</code>) so it cannot regress by accident.</p>
-  <p>The mechanism still exists for <em>your</em> steps. If your game genuinely cannot run without something — a
-  server login, say — override <code>IsCritical =&gt; true</code> on your own step, and build the retry screen that
-  has to go with it.</p>
+  <p><strong>The player waits for four steps, and nothing else.</strong> <code>BootstrapReady</code> publishes as
+  soon as the blocking phase ends; the other twelve steps finish while the player is already in the game.</p>
+  <p><strong>No shipped step is critical</strong> either — a step that fails degrades a feature and the pipeline
+  runs on. Both rules are pinned by tests (<code class="src">BootstrapPhaseTests</code>,
+  <code class="src">BootstrapDegradationTests</code>) so neither can regress by accident.</p>
+  <p>The critical mechanism still exists for <em>your</em> steps. If your game genuinely cannot run without
+  something — a server login, say — override <code>IsCritical =&gt; true</code> on your own step, and build the
+  retry screen that has to go with it.</p>
+</div>
+
+<h3>Why boot is split in two</h3>
+
+<p>
+  Until 0.7.0 all 16 steps were on the critical path, each with a 30s timeout and two attempts. That is a
+  <strong>940-second worst case</strong> — nearly sixteen minutes of splash screen — for a genre where boot should
+  be about a second. Even the happy path spent 400ms on delays the mock services added for realism.
+</p>
+<p>
+  Auditing what each step actually costs and what actually depends on it found the sequential design was buying
+  almost nothing. There are exactly <strong>three real ordering constraints</strong> in the whole pipeline —
+  <code>Save→Audio</code>, <code>Save→Notification</code>, <code>RemoteConfig→VersionCheck</code> — and
+  <strong>nine of the sixteen steps are islands</strong> that nothing in the template resolves at all.
+</p>
+<p>
+  So the split: four cheap, genuinely-needed steps block; everything else runs after the player is already playing.
+  The deferred phase stays <em>sequential</em> rather than concurrent, deliberately — the tail costs the player
+  nothing, and declared order preserves <code>RemoteConfig→VersionCheck</code> for free without a dependency API and
+  without interleaving services that were never written for it.
+</p>
+
+<div class="warn">
+  <p><strong>The blocking budget is the real guarantee.</strong> The whole blocking phase runs under a 5s ceiling
+  (<code>BootstrapPipeline.DefaultBlockingBudget</code>). When it expires, unfinished and unstarted blocking steps
+  are recorded degraded and <code>BootstrapReady</code> fires anyway. This holds no matter how many blocking steps
+  you add — but treat it as a circuit breaker, not a target. Anything you put in the blocking phase is time a
+  player spends looking at a splash screen.</p>
 </div>
 
 <h3>Why nothing is critical</h3>
@@ -309,6 +365,12 @@ private void Start()
   <li><strong>Attempts</strong> are <code>MaxRetries + 1</code> — <code>MaxRetries</code> counts <em>additional</em>
     tries, and defaults to 1, so a step runs twice before giving up. <code>AssetStep</code> overrides it to 2
     (3 attempts), because a transient catalog fetch is the failure most worth retrying.</li>
+  <li><strong>Per-step timeout defaults to 10s</strong>, down from 30s. A step that needs longer than that is
+    telling you it belongs in the deferred phase. <code>TimeSpan.Zero</code> disables the deadline entirely —
+    <code>ConsentStep</code> uses it, because a real consent dialog is waiting on a human and a timeout would
+    cancel it mid-read.</li>
+  <li><strong>The blocking phase has its own budget</strong> on top of the per-step timeouts. Whichever runs out
+    first wins; the budget is what bounds time-to-first-screen.</li>
   <li><strong>A step that exhausts its attempts is recorded, announced, and passed.</strong> The pipeline logs
     <code>"exhausted N attempt(s); continuing degraded"</code>, calls <code>IBootstrapReport.Record</code> and
     publishes <code>BootstrapStepDegraded(StepName, Error, Attempts)</code>.</li>
@@ -654,6 +716,7 @@ private void Start()
 <table>
   <thead><tr><th>Event</th><th>Assembly</th><th>Published when</th></tr></thead>
   <tbody>
+    <tr><td><code>BootstrapReady(BlockingMs)</code></td><td>Zero.Core</td><td>The blocking phase finished — show the game. Carries how long the player actually waited. Deferred steps are still running.</td></tr>
     <tr><td><code>BootstrapStepDegraded(StepName, Error, Attempts)</code></td><td>Zero.Core</td><td>A step exhausted its retries. The pipeline continues; the durable equivalent is <code>IBootstrapReport</code>.</td></tr>
     <tr><td><code>BootstrapFailed(StepName, Error, Attempt)</code></td><td>Zero.Core</td><td>A <em>critical</em> step aborted the pipeline. No shipped step is critical, so this only fires for steps you add.</td></tr>
     <tr><td><code>BootstrapRetryRequested</code></td><td>Zero.Core</td><td>You publish it; <code>GameLauncher</code> re-runs the pipeline.</td></tr>

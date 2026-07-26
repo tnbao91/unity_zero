@@ -50,8 +50,10 @@ namespace Zero.Bootstrap
             _isRunning = true;
             try
             {
+                // Returns when the BLOCKING phase is done — deferred steps are still running.
+                // BootstrapReady has already been published by this point; that is the signal
+                // a consumer hooks to leave the splash screen.
                 await _pipeline.RunAsync(null, _cts.Token);
-                _log.Info("[Bootstrap] All steps completed.");
             }
             catch (OperationCanceledException)
             {

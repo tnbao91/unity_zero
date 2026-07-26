@@ -9,6 +9,9 @@ namespace Zero.Bootstrap.Steps
     public sealed class NotificationStep : BootstrapStepBase
     {
         public override string Name => "Notification";
+
+        // Deferred: Nothing schedules a notification at boot. Depends on Save, which is blocking.
+        public override BootstrapPhase Phase => BootstrapPhase.Deferred;
         public override bool IsCritical => false;
 
         private readonly INotificationService _service;

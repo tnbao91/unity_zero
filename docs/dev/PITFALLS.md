@@ -225,7 +225,7 @@ Singletons with `Resolution.Lazy` may not be constructed yet when the first Mono
 
 ### Bootstrap step contract
 
-`BootstrapStepBase` provides `Name`, `IsCritical`, `Timeout` (default 30s), `MaxRetries` (default 1). The pipeline:
+`BootstrapStepBase` provides `Name`, `IsCritical`, `Phase` (default `Blocking`), `Timeout` (default 10s), `MaxRetries` (default 1). The pipeline:
 
 - Runs steps sequentially in the order declared in `ProjectScopeInstaller.InstallBindings` (consumers extend the list by registering `BootstrapStepRegistration` from their own installer — see `docs/architecture/bootstrap-pipeline.md`).
 - Wraps each step in a linked CTS that fires `CancelAfter(step.Timeout)`.

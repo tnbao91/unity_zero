@@ -43,6 +43,7 @@ namespace Zero.Tests.EditMode
         {
             public string Name { get; }
             public bool IsCritical => false;
+            public BootstrapPhase Phase => BootstrapPhase.Blocking;
             public TimeSpan Timeout => TimeSpan.FromSeconds(1);
             public int MaxRetries => 0;
             public NamedStep(string name) => Name = name;

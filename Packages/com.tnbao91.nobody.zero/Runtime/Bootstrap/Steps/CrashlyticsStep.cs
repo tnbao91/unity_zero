@@ -10,6 +10,10 @@ namespace Zero.Bootstrap.Steps
     {
         public override string Name => "Crashlytics";
 
+        // Deferred: Telemetry init. Nothing in the template consumes it, and a game that boots
+        // without crash reporting is still a game.
+        public override BootstrapPhase Phase => BootstrapPhase.Deferred;
+
         // First in pipeline order so later failures get reported (ordering), but a
         // crash-reporter outage must never block app launch (criticality) — aborting
         // launch produces zero reports either way. 5s caps the splash-screen cost

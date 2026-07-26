@@ -42,7 +42,10 @@ Apply the same rule in YOUR game when subsystems should be loosely coupled. Only
 `BootstrapPipeline` runs 16 sequential `IBootstrapStep` items at app start:
 
 ```
-1.  Crashlytics       (first, so it sees later failures — non-critical)
+PHASES: only Log, DeviceProfile, Save and Asset are Blocking — those four are all the
+player waits for. BootstrapReady then fires and the other twelve run in the background.
+
+1.  Crashlytics       (deferred — first of the background set)
 2.  Log
 3.  DeviceProfile
 4.  Save              (early so later steps can read settings)
