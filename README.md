@@ -158,6 +158,8 @@ When editing the package: the dev `Assets/_Project/Scenes/Bootstrap.unity` is th
 
 ## Documentation
 
+**Start here:** [`docs/guide.html`](docs/guide.html) — one self-contained page covering the boot flow, the assembly map, setup, the extension seams and the full service catalogue. Open it in a browser; it needs no server and no network.
+
 - **Architecture** — [event bus](docs/architecture/event-bus.md), [bootstrap pipeline](docs/architecture/bootstrap-pipeline.md), [asmdef graph](docs/architecture/asmdef-graph.md).
 - **Services (real impls)** — [save](docs/services/save.md), [localization](docs/services/localization.md), [pool](docs/services/pool.md), [audio](docs/services/audio.md), [input](docs/services/input.md), [notification](docs/services/notification.md), [version-check](docs/services/version-check.md), [time](docs/services/time.md).
 - **Services (infra & policy)** — [asset](docs/services/asset.md), [scene](docs/services/scene.md), [log](docs/services/log.md), [device-profile](docs/services/device-profile.md), [events](docs/services/events.md), [adplacement](docs/services/adplacement.md).

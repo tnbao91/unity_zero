@@ -22,7 +22,7 @@ The interface is one method on purpose — receipts come in many shapes, output 
 
 ## Stub behavior
 
-`StubReceiptValidator` (`Assets/_Project/Scripts/Runtime/Services/ReceiptValidator/StubReceiptValidator.cs`):
+`StubReceiptValidator` (`Packages/com.tnbao91.nobody.zero/Runtime/Services/ReceiptValidator/StubReceiptValidator.cs`):
 - `ValidateAsync(_, _)` returns `UniTask.FromResult(true)`.
 - Logs `[ReceiptValidator] Stub accepting receipt for {productId}` so it's loud during dev.
 

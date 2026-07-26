@@ -48,7 +48,7 @@ Semver parser is 3-part `major.minor.patch`. Pre-release / build metadata (`1.0.
 
 ## Extension Points
 
-**Swap the implementation** by editing `Assets/_Project/Scripts/Runtime/Services/VersionCheck/VersionCheckServiceInstaller.cs`:
+**Swap the implementation** by editing `Packages/com.tnbao91.nobody.zero/Runtime/Services/VersionCheck/VersionCheckServiceInstaller.cs`:
 
 ```csharp
 builder.RegisterFactory<IVersionCheckService>(

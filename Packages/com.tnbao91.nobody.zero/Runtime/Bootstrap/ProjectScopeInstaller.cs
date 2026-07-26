@@ -115,7 +115,9 @@ namespace Zero.Bootstrap
                 var reporter = c.Resolve<IBootstrapProgressReporter>();
                 var bus = c.Resolve<IEventBus>();
 
-                // Order: Crashlytics first (critical), Log/Profile next so subsequent steps
+                // Order: Crashlytics first (NOT critical — first so it can observe every
+                // later step's failure; the critical steps are DeviceProfile/Asset/Consent),
+                // Log/Profile next so subsequent steps
                 // can log + read device info, Save moved up so any later step can read
                 // persisted settings (audio volume, locale preference, consent state).
                 // Localization sits next to Analytics so UI text is ready before Attribution

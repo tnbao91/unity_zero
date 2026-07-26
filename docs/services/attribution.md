@@ -24,7 +24,7 @@ namespace Zero.Core
 
 ## Mock behavior
 
-`MockAttributionService` (`Assets/_Project/Scripts/Runtime/Services/Attribution/MockAttributionService.cs`):
+`MockAttributionService` (`Packages/com.tnbao91.nobody.zero/Runtime/Services/Attribution/MockAttributionService.cs`):
 - `DeviceId` returns a Guid generated once and persisted via `ISaveService` so it survives restarts.
 - `TrackEvent` and `TrackPurchase` write to `Debug.Log`.
 - `InitializeAsync` is a no-op.

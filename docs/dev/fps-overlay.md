@@ -45,7 +45,7 @@ No mobile gesture; on-device debugging usually pairs with a Bluetooth keyboard o
 
 ## Extension Points
 
-**Add metrics** by editing `Assets/_Project/Scripts/Runtime/DevTools/FpsOverlay.cs`. Common additions:
+**Add metrics** by editing `Packages/com.tnbao91.nobody.zero/Runtime/DevTools/FpsOverlay.cs`. Common additions:
 
 ```csharp
 // Render thread pressure

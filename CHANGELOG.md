@@ -8,6 +8,18 @@ All notable template-level changes are recorded here. Format follows [Keep a Cha
 - **Host project editor: `6000.5.0f1` → `6000.5.5f1`** (patch LTS). `ProjectSettings/ProjectVersion.txt`, the CI image (`tests.yml` `unityVersion`), the README badge + clone step and `CLAUDE.md` all move together. `ProjectSettings/EditorBuildSettings.asset` drops `m_UseUCBPForAssetBundles` — written by the editor upgrade, not by hand. The package's `"unity": "6000.5"` minimum is unchanged; consumers on any 6000.5.x are unaffected.
 - Host project `com.unity.purchasing` `5.3.1` → `5.4.2` (pulls `com.unity.services.core` `1.14.0` → `1.18.0`). The package's own dependency floor stays at `5.3.1` — it is a minimum, and raising it would force consumers up for no reason.
 
+### Added
+- `com.unity.pipeline` `0.4.0-exp.1` in the host project's `Packages/manifest.json`. Experimental, host-side only — it is **not** a dependency of `com.tnbao91.nobody.zero`, so consumers do not inherit it.
+
+### Fixed
+- **Documentation that contradicted the code.** The consumer-side `pitfalls-guard` agent grepped `ZeroSecrets.asset` for `REPLACE_ME_`, but the marker the code ships is `REPLACE_BEFORE_SHIPPING` — that P0 save-encryption check could never fire. Also: `CrashlyticsStep` was documented as the only *critical* bootstrap step in three places (it is `IsCritical => false`; the critical three are `DeviceProfile`, `Asset`, `Consent`); `IBootstrapProgressReporter` was documented as `Resolution.Eager` (it is `Lazy`); `asmdef-graph.md` claimed `Zero.UI` references `Zero.Services.Asset` (it uses `Unity.Addressables` directly); `AppPaused`/`AppQuitting` were referenced in four docs including a non-compiling snippet, though no such type ships; `iap.md` pinned Unity IAP `5.2.1`; `ci.md`'s PlayMode snippet pinned `6000.3.11f1`. 23 live references to the pre-UPM `Assets/_Project/Scripts/` path now point at the real package paths.
+
+### Docs
+- New [`docs/guide.html`](docs/guide.html) — a single self-contained page covering the boot flow, the assembly map, setup, the extension seams and the service catalogue, written against the code rather than the prose.
+
+### Notes
+- `com.unity.addressables` is pinned `2.9.1` here. The `0.5.2` GUID collision only fires on Addressables **3.0.0**, which is why this repo never reproduced it locally — it surfaced in a consumer project that had upgraded.
+
 ## [0.5.2] — 2026-07-26 — GUID collision with Addressables 3.0.0
 
 ### Fixed

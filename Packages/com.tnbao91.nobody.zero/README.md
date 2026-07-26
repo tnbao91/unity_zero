@@ -56,7 +56,7 @@ Then:
 ### 5. Configure save encryption seeds
 
 - Copy `ZeroSecrets.asset.example` to `Assets/Resources/ZeroSecrets.asset`.
-- Open in Inspector. Replace the placeholder seeds (`REPLACE_ME_*`) with per-game random strings — these encrypt save data; do **not** commit them.
+- Open in Inspector. Replace both placeholder seeds — `_aesSeed` and `_hmacSeed` ship as `REPLACE_BEFORE_SHIPPING` — with per-game random strings. These encrypt save data; do **not** commit them.
 
 > Player builds throw `InvalidOperationException` at startup if seeds remain at their placeholder values. Editor warns loudly but continues so iteration isn't blocked.
 
@@ -75,6 +75,8 @@ Move `CLAUDE.md` + `claude-context/` from `Assets/Samples/com.tnbao91.nobody.zer
 Full readme inside the sample bundle.
 
 ## Documentation
+
+**Start here** — [Flow &amp; Setup Guide](https://github.com/tnbao91/unity_zero/blob/main/docs/guide.html): one self-contained page covering the boot flow, the assembly map, setup, the extension seams and the full service catalogue.
 
 Full docs at the repo: <https://github.com/tnbao91/unity_zero/tree/main/docs>
 

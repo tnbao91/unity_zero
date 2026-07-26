@@ -55,9 +55,11 @@ Cross-reference with which scene the caller runs in. If unclear, flag P1 for the
 ### E. `ZeroSecrets.asset` placeholders not replaced
 
 ```bash
-grep -E 'REPLACE_ME_' Assets/Resources/ZeroSecrets.asset 2>/dev/null && echo "P0: ZeroSecrets contains placeholders"
+grep -E 'REPLACE_BEFORE_SHIPPING' Assets/Resources/ZeroSecrets.asset 2>/dev/null && echo "P0: ZeroSecrets contains placeholders"
 ```
 Player builds throw at startup. Editor builds warn loud but iterate.
+
+The marker string is `ZeroSecrets.PlaceholderMarker` in the package (`Runtime/Services/Save/ZeroSecrets.cs`). If this grep is ever changed, read that constant first — a grep for a string the asset never contains passes silently and the check stops existing.
 
 ### F. `bundleVersion` not 3-part semver
 
@@ -119,7 +121,7 @@ The only legitimate consumer use of `Zero.Bootstrap` is the partial-class file `
 ### Verdict: PASS | FAIL | WARN
 
 ### Findings (severity: P0 = blocker, P1 = must-fix, P2 = recommend)
-- **P0 — ZeroSecrets placeholders**: Assets/Resources/ZeroSecrets.asset still contains REPLACE_ME_ markers. Player build will throw.
+- **P0 — ZeroSecrets placeholders**: Assets/Resources/ZeroSecrets.asset still contains REPLACE_BEFORE_SHIPPING markers. Player build will throw.
 - **P0 — Missing UIRoot**: Game.unity references IUIService.PushAsync but no UIRoot in the scene.
 - **P1 — Legacy Input**: Assets/_Game/Player/PlayerInput.cs:23 — `Input.GetKey(KeyCode.Space)` throws under Input System.
 - **P1 — bundleVersion 2-part**: 0.1 → use 1.0.0.

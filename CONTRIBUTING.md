@@ -15,13 +15,13 @@ If `PLAN.md` and the code drift, the code is wrong — not the plan. Reconcile b
 
 The "service convention" in `CLAUDE.md` is the recipe. Concretely:
 
-1. **Interface** at `Assets/_Project/Scripts/Runtime/Core/Interfaces/I<Name>Service.cs`. Namespace `Zero.Core`. Methods returning `UniTask` for async, `Observable<T>` (R3) for streams.
-2. **Implementation folder** at `Assets/_Project/Scripts/Runtime/Services/<Name>/` with its own `Zero.Services.<Name>.asmdef`. Mirror an existing asmdef (`Zero.Services.Audio.asmdef` is a clean reference) — `autoReferenced: false`, references listed by **string name** not GUID, only the deps you actually use.
+1. **Interface** at `Packages/com.tnbao91.nobody.zero/Runtime/Core/Interfaces/I<Name>Service.cs`. Namespace `Zero.Core`. Methods returning `UniTask` for async, `Observable<T>` (R3) for streams.
+2. **Implementation folder** at `Packages/com.tnbao91.nobody.zero/Runtime/Services/<Name>/` with its own `Zero.Services.<Name>.asmdef`. Mirror an existing asmdef (`Zero.Services.Audio.asmdef` is a clean reference) — `autoReferenced: false`, references listed by **string name** not GUID, only the deps you actually use.
 3. **Installer** `<Name>ServiceInstaller.cs` — static class with `Install(ContainerBuilder builder)`. Almost always one `RegisterType` call: `builder.RegisterType(typeof(<Impl>), new[] { typeof(I<Name>Service) }, Lifetime.Singleton, Resolution.Lazy);`. If the ctor takes a non-contract value (string, int, computed), use `RegisterFactory` — see `VersionCheckServiceInstaller.cs` for the canonical example.
-4. **Bootstrap step** (only if init must happen at startup) — `<Name>Step : BootstrapStepBase` at `Assets/_Project/Scripts/Runtime/Bootstrap/Steps/<Name>Step.cs`. Override `Name`, `IsCritical` (default false; only Crashlytics is currently critical), and optionally `Timeout` / `MaxRetries`.
+4. **Bootstrap step** (only if init must happen at startup) — `<Name>Step : BootstrapStepBase` at `Packages/com.tnbao91.nobody.zero/Runtime/Bootstrap/Steps/<Name>Step.cs`. Override `Name`, `IsCritical` (default false; the critical steps today are `DeviceProfileStep`, `AssetStep` and `ConsentStep` — a critical failure aborts bootstrap, so reach for it only when the game genuinely cannot run without the step), and optionally `Timeout` / `MaxRetries`.
 5. **Wire** in `ProjectScopeInstaller.cs`: add `<Name>ServiceInstaller.Install(builder)` and the step to the `steps` array in the right position. Place steps that need save data after `SaveStep`, steps that need remote config after `RemoteConfigStep`.
 6. **Reference** the new asmdef from `Zero.Bootstrap.asmdef` so the composition root can see it.
-7. **Tests** at `Assets/_Project/Scripts/Tests/EditMode/<Name>ServiceTests.cs`. Reference the new asmdef from `Zero.Tests.EditMode.asmdef`.
+7. **Tests** at `Packages/com.tnbao91.nobody.zero/Tests/EditMode/<Name>ServiceTests.cs`. Reference the new asmdef from `Zero.Tests.EditMode.asmdef`.
 8. **Doc** at `docs/services/<name>.md` matching the fixed format (Overview / Public API / Extension Points / Examples / Known Limitations / Design Rationale).
 
 ## Extending Mock SDKs
@@ -36,7 +36,7 @@ The template ships mock implementations for Crashlytics, Consent, RemoteConfig, 
 
 ## Test conventions
 
-- **EditMode** tests live under `Assets/_Project/Scripts/Tests/EditMode/`. PlayMode tests under `PlayMode/`. Both gated on `UNITY_INCLUDE_TESTS`.
+- **EditMode** tests live under `Packages/com.tnbao91.nobody.zero/Tests/EditMode/`. PlayMode tests under `PlayMode/`. Both gated on `UNITY_INCLUDE_TESTS`.
 - **Async EditMode tests** use `[UnityTest] public IEnumerator Foo() => UniTask.ToCoroutine(async () => { ... })`. NUnit's `[Test]` does not await `UniTask`. Pure-sync tests can keep `[Test]`.
 - **Tests that subscribe via lambda** must `using R3;` — `Observable<T>.Subscribe(Action<T>)` is an extension method.
 - **Tests with `[UnityTest]`** must `using UnityEngine.TestTools;`.

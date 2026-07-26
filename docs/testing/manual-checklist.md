@@ -184,7 +184,7 @@ After verifying each feature individually:
 1. **Bootstrap launches cleanly** — no exceptions, all steps complete
 2. **All three services initialize** — check Editor console for "[AUDIO]", "[NOTIF]", and no Input errors
 3. **Mock services fall back gracefully** — set `#if ZERO_USE_MOCK_AUDIO` in installer, verify app still launches
-4. **No asmdef cycles** — `grep -r "Zero.Audio\|Zero.Input\|Zero.Notification" Assets/_Project/Scripts/Runtime/Core/` returns nothing (circular refs would fail here)
+4. **No asmdef cycles** — `grep -r "Zero.Audio\|Zero.Input\|Zero.Notification" Packages/com.tnbao91.nobody.zero/Runtime/Core/` returns nothing (circular refs would fail here)
 
 ---
 

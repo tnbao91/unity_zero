@@ -4,7 +4,7 @@
 
 `IIAPService` exposes in-app purchase flows: initialize with a product id list, kick off `PurchaseAsync`, restore prior purchases, read localized prices for storefront display. The template ships `MockIapService` which auto-completes every purchase with `PurchaseResult.Purchased` after a short delay — useful for prototyping reward grants without storefront wiring.
 
-Real impls wrap `com.unity.purchasing` (Unity IAP, version 5.2.1 already in `Packages/manifest.json`).
+Real impls wrap `com.unity.purchasing` (Unity IAP). The package declares a `5.3.1` floor in its own `package.json`; this repo's host project resolves `5.4.2`. Because UPM dependencies are minimums, your project may legitimately be on a higher version than either number.
 
 ## Public API
 
@@ -36,7 +36,7 @@ namespace Zero.Core
 
 ## Mock behavior
 
-`MockIapService` (`Assets/_Project/Scripts/Runtime/Services/IAP/MockIapService.cs`):
+`MockIapService` (`Packages/com.tnbao91.nobody.zero/Runtime/Services/IAP/MockIapService.cs`):
 - `InitializeAsync` returns `UniTask.CompletedTask` and flips `IsInitialized = true`.
 - `PurchaseAsync` waits ~500ms then returns `PurchaseOutcome(Purchased, productId, receipt: "MOCK_RECEIPT")` and emits the same on `OnPurchase`.
 - `GetLocalizedPrice` returns a stub like `"$0.99"`.
@@ -46,7 +46,7 @@ namespace Zero.Core
 
 ### Swap to Unity IAP (`com.unity.purchasing`)
 
-1. Confirm `com.unity.purchasing` (5.2.1+) is in `Packages/manifest.json` (already in this template).
+1. Confirm `com.unity.purchasing` (5.3.1+) is in `Packages/manifest.json` — Zero declares it as a dependency, so UPM pulls it in for you.
 2. Add `Unity.Services.Core`, `Unity.Purchasing` to `Zero.Services.IAP.asmdef` references.
 3. Implement `UnityIapService : IIAPService, IDetailedStoreListener`:
 

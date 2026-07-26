@@ -24,7 +24,7 @@ namespace Zero.Core
 
 ## Mock behavior
 
-`MockAnalyticsService` (`Assets/_Project/Scripts/Runtime/Services/Analytics/MockAnalyticsService.cs`) — every `LogEvent` writes a formatted line like `[Analytics] level_started {level=5, difficulty=hard}` to `Debug.Log`. `SetUserProperty` and `SetUserId` log similarly. `InitializeAsync` is a no-op.
+`MockAnalyticsService` (`Packages/com.tnbao91.nobody.zero/Runtime/Services/Analytics/MockAnalyticsService.cs`) — every `LogEvent` writes a formatted line like `[Analytics] level_started {level=5, difficulty=hard}` to `Debug.Log`. `SetUserProperty` and `SetUserId` log similarly. `InitializeAsync` is a no-op.
 
 ## Extension Points
 
