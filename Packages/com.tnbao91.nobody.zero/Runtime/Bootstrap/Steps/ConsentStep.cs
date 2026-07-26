@@ -10,6 +10,15 @@ namespace Zero.Bootstrap.Steps
     {
         public override string Name => "Consent";
 
+        // Deferred: A real UMP/ATT flow shows modal system UI. It must never sit between the
+        // player and the game — and Apple's own guidance is to ask at a value moment.
+        public override BootstrapPhase Phase => BootstrapPhase.Deferred;
+
+        // No deadline. A real consent dialog is waiting on a human being; a step timeout
+        // would cancel it while the player is mid-read. Zero means "no timeout" to the
+        // pipeline. Safe only because this step is deferred — it blocks nobody.
+        public override TimeSpan Timeout => TimeSpan.Zero;
+
         // The legal duty is "do not track without consent", not "do not run without
         // consent". If the consent form cannot load, the correct outcome is a playable
         // game with no personalization — so this degrades rather than blocks.

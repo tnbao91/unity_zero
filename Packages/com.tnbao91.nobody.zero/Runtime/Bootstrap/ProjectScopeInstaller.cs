@@ -128,14 +128,22 @@ namespace Zero.Bootstrap
                 // BootstrapStepDegraded. The critical mechanism still exists for consumer
                 // steps that genuinely gate the game (see BootstrapStepBase.IsCritical).
                 //
-                // Order: Crashlytics first so it can observe every later step's failure,
-                // Log/Profile next so subsequent steps
-                // can log + read device info, Save moved up so any later step can read
-                // persisted settings (audio volume, locale preference, consent state).
-                // Localization sits next to Analytics so UI text is ready before Attribution
-                // / Ads / IAP surface any localized errors. UIService has no bootstrap
-                // step — consumers attach a UIRoot MonoBehaviour to their scene to wire
-                // layer canvases at scene-load time.
+                // PHASES decide who waits, not this array's order. Only Log, DeviceProfile,
+                // Save and Asset are Blocking — those four are all the player waits for.
+                // The other twelve are Deferred and run after BootstrapReady, while the
+                // player is already in the game. Each step states its own reason.
+                //
+                // The array order still matters within each phase, because both phases run
+                // sequentially. There are exactly three real ordering constraints, all
+                // verified from call sites rather than assumed:
+                //   Save -> Audio         (AudioMixerService reads audio.bus.* volumes)
+                //   Save -> Notification  (reads notification.permission.requested)
+                //   RemoteConfig -> VersionCheck (reads min/recommended version keys)
+                // The first two are satisfied because Save is Blocking; the third is
+                // satisfied because the deferred phase preserves declared order.
+                //
+                // UIService has no bootstrap step — consumers attach a UIRoot MonoBehaviour
+                // to their scene to wire layer canvases at scene-load time.
                 var defaultSteps = new IBootstrapStep[]
                 {
                     new CrashlyticsStep(crash),

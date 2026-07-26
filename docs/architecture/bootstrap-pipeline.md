@@ -2,7 +2,7 @@
 
 ## Overview
 
-The bootstrap pipeline is a **sequential, resilient startup sequence** that initializes all services from a single, reorderable list. Each step (Crashlytics, Save, Assets, Localization, Ads, etc.) is optional, has configurable timeout/retry/criticality, and reports progress to a `IBootstrapProgressReporter` for UI display. No shipped step is critical: a step that fails is recorded in `IBootstrapReport`, announced as `BootstrapStepDegraded`, and the pipeline runs on so the player still reaches the game. A *consumer* step that opts into `IsCritical` aborts the entire pipeline — the abort publishes `BootstrapFailed` on `IEventBus` and surfaces as `BootstrapStepFailedException`, and a consumer can publish `BootstrapRetryRequested` to make `GameLauncher` re-run the pipeline (see "Failure & retry" below).
+The bootstrap pipeline is a **two-phase, resilient startup sequence** that initializes all services from a single, reorderable list. **Blocking** steps run first and are all the player waits for; `BootstrapReady` then publishes and the **deferred** steps continue in the background while the player is already in the game. Only four of the sixteen shipped steps are blocking. Each step (Crashlytics, Save, Assets, Localization, Ads, etc.) is optional, has configurable timeout/retry/criticality, and reports progress to a `IBootstrapProgressReporter` for UI display. No shipped step is critical: a step that fails is recorded in `IBootstrapReport`, announced as `BootstrapStepDegraded`, and the pipeline runs on so the player still reaches the game. A *consumer* step that opts into `IsCritical` aborts the entire pipeline — the abort publishes `BootstrapFailed` on `IEventBus` and surfaces as `BootstrapStepFailedException`, and a consumer can publish `BootstrapRetryRequested` to make `GameLauncher` re-run the pipeline (see "Failure & retry" below).
 
 ## How the root container is built
 
@@ -163,24 +163,36 @@ Defaults shipped by the template, in pipeline order.
 
 `IsCritical` remains available for **consumer** steps that genuinely gate the game (a mandatory server login, say). It is not about importance — it answers "is the app unusable if this never initializes, *and* do I have a retry screen to show?" If the answer to the second half is no, leave it false; see "Why nothing is critical" below.
 
-| # | Step | IsCritical | Timeout | MaxRetries | Note |
+| # | Step | Phase | Timeout | MaxRetries | Note |
 |---|---|---|---|---|---|
-| 1 | Crashlytics | false | **5s** | 1 | First for ordering; never blocks launch |
-| 2 | Log | false | 30s | 1 | |
-| 3 | DeviceProfile | false | 30s | 1 | Failure = Unity default quality, not a blocked launch |
-| 4 | Save | false | 30s | 1 | Service resets-to-empty internally |
-| 5 | Asset | false | 30s | **2** | Retried 3× — transient catalog fetch is worth retrying |
-| 6 | Consent | false | 30s | 1 | Failure must fall back to non-personalized |
-| 7 | RemoteConfig | false | 30s | 1 | |
-| 8 | Analytics | false | 30s | 1 | |
-| 9 | Localization | false | 30s | 1 | |
-| 10 | Attribution | false | 30s | 1 | |
-| 11 | Ads | false | 30s | 1 | |
-| 12 | IAP | false | 30s | 1 | |
-| 13 | Audio | false | 30s | 1 | |
-| 14 | Time | false | 30s | 1 | |
-| 15 | Notification | false | 30s | 1 | |
-| 16 | VersionCheck | false | 30s | 1 | |
+| 1 | Log | **blocking** | 10s | 1 | No-op; kept because step names are public API |
+| 2 | DeviceProfile | **blocking** | 10s | 1 | Sync and free; targetFrameRate wants setting early |
+| 3 | Save | **blocking** | 10s | 1 | First screen shows player state; two steps depend on it |
+| 4 | Asset | **blocking** | 10s | **2** | First screen is content; catalog fetch is worth retrying |
+| 5 | Crashlytics | deferred | **5s** | 1 | First of the deferred set |
+| 6 | Consent | deferred | **none** | 1 | Real consent waits on a human — no deadline |
+| 7 | RemoteConfig | deferred | 10s | 1 | Defaults readable before the fetch lands |
+| 8 | Analytics | deferred | 10s | 1 | Real SDKs buffer pre-init events |
+| 9 | Localization | deferred | 10s | 1 | Worst case is a brief flash of raw keys |
+| 10 | Attribution | deferred | 10s | 1 | Needs the event in-session, not pre-frame-1 |
+| 11 | Ads | deferred | 10s | 1 | Mediation init takes 1-5s |
+| 12 | IAP | deferred | 10s | 1 | Store catalog fetch; gate the shop, not the game |
+| 13 | Audio | deferred | 10s | 1 | Depends on Save, which is blocking |
+| 14 | Time | deferred | 10s | 1 | Gate on ITimeService.IsServerSynced |
+| 15 | Notification | deferred | 10s | 1 | Depends on Save, which is blocking |
+| 16 | VersionCheck | deferred | 10s | 1 | Runs after RemoteConfig; declared order preserved |
+
+### Phases
+
+`IBootstrapStep.Phase` decides whether the player waits. `BootstrapStepBase.Phase` defaults to **`Blocking`** so an existing consumer step keeps the semantics it had before phases existed — but almost every step should be `Deferred`.
+
+The blocking phase runs under a whole-phase budget (`BootstrapPipeline.DefaultBlockingBudget`, 5s). On expiry, unfinished and unstarted blocking steps are recorded degraded and `BootstrapReady` fires anyway — the budget is what bounds time-to-first-screen no matter how many blocking steps are added. Treat it as a circuit breaker, not a target.
+
+The deferred phase runs **sequentially**, not concurrently. The tail costs the player nothing, and declared order preserves the one ordering edge inside the set (`RemoteConfig → VersionCheck`) without a dependency-declaration API and without interleaving services never written for it.
+
+There are exactly three real ordering constraints in the whole pipeline, all verified from call sites: `Save → Audio`, `Save → Notification`, `RemoteConfig → VersionCheck`. Nine of the sixteen steps are islands nothing resolves at all.
+
+`BootstrapPipeline.RunAsync` returns when the blocking phase ends. `DeferredCompletion` observes the rest; nothing needs to await it to play.
 
 ### Why nothing is critical
 

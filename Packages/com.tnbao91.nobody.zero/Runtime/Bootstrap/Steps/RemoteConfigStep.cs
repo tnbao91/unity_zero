@@ -9,6 +9,10 @@ namespace Zero.Bootstrap.Steps
     public sealed class RemoteConfigStep : BootstrapStepBase
     {
         public override string Name => "RemoteConfig";
+
+        // Deferred: Defaults are seeded locally, so values are readable before the fetch lands.
+        // Subscribe to OnConfigUpdated for the late arrival.
+        public override BootstrapPhase Phase => BootstrapPhase.Deferred;
         public override bool IsCritical => false;
 
         private readonly IRemoteConfigService _service;

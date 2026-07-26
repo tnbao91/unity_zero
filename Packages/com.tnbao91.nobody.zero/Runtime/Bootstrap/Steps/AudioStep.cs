@@ -9,6 +9,10 @@ namespace Zero.Bootstrap.Steps
     public sealed class AudioStep : BootstrapStepBase
     {
         public override string Name => "Audio";
+
+        // Deferred: Loads the mixer through Addressables. Depends on Save, which is blocking, so
+        // running here is safe.
+        public override BootstrapPhase Phase => BootstrapPhase.Deferred;
         public override bool IsCritical => false;
 
         private readonly IAudioService _service;

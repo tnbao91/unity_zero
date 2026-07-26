@@ -33,6 +33,7 @@ namespace Zero.Services.Audio
         private IPool<GameObject> _sfxPool;
         private GameObject _sfxTemplateGo;
         private bool _disposed;
+        private bool _initialized;
 
         public AudioMixerService(ILogService log, IAssetService assetService, ISaveService saveService, IPoolService poolService)
         {
@@ -44,6 +45,13 @@ namespace Zero.Services.Audio
 
         public async UniTask InitializeAsync(CancellationToken ct = default)
         {
+            // Idempotent. Without this guard every call created a second [Zero.AudioMusic] and
+            // [Zero.AudioSfxSource] with DontDestroyOnLoad and overwrote _mixerHandle without
+            // disposing it — a leak per invocation. The BootstrapRetryRequested path re-runs
+            // every step, so this was reachable in shipped builds.
+            if (_initialized) return;
+            _initialized = true;
+
             // Pre-check: skip LoadAsync if key isn't registered, otherwise Addressables logs a red
             // InvalidKeyException to the console before our try/catch can convert it to a warn.
             // Same defensive pattern as LocalizationStep guarding LocalizationSettings.HasSettings.

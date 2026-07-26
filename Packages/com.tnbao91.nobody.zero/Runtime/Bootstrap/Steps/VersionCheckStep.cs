@@ -9,6 +9,10 @@ namespace Zero.Bootstrap.Steps
     public sealed class VersionCheckStep : BootstrapStepBase
     {
         public override string Name => "VersionCheck";
+
+        // Deferred: Runs after RemoteConfigStep in declared order, which the sequential deferred
+        // phase preserves.
+        public override BootstrapPhase Phase => BootstrapPhase.Deferred;
         public override bool IsCritical => false;
 
         private readonly IVersionCheckService _service;

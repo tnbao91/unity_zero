@@ -27,8 +27,15 @@ namespace Zero.Services.Save
 
         private readonly ILogService _log;
         private readonly string _filePath;
-        private readonly byte[] _aesKey;
-        private readonly byte[] _hmacKey;
+        // Derived lazily, not in the ctor. In a player build with a missing or placeholder
+        // ZeroSecrets.asset, LoadSeeds throws — and the ctor runs during Reflex container
+        // resolve, before step 1, where the bootstrap pipeline cannot see it. The failure
+        // surfaced as an opaque resolve error with no BootstrapFailed, no degradation and no
+        // log line from the pipeline. Deferring it to first use puts the identical exception
+        // inside SaveStep, where it is reported like every other step failure.
+        private byte[] _aesKey;
+        private byte[] _hmacKey;
+        private bool _keysResolved;
         private readonly SemaphoreSlim _ioLock = new(1, 1);
         private readonly Subject<Unit> _onLoaded = new();
         private readonly object _dataLock = new();
@@ -48,9 +55,16 @@ namespace Zero.Services.Save
         {
             _log = log;
             _filePath = Path.Combine(Application.persistentDataPath, FileName);
-            (byte[] aesKey, byte[] hmacKey) = LoadSeeds(log);
+        }
+
+        // Call before any crypto. Throws in player builds when ZeroSecrets is unconfigured.
+        private void EnsureKeys()
+        {
+            if (_keysResolved) return;
+            (byte[] aesKey, byte[] hmacKey) = LoadSeeds(_log);
             _aesKey = aesKey;
             _hmacKey = hmacKey;
+            _keysResolved = true;
         }
 
         private static (byte[] aesKey, byte[] hmacKey) LoadSeeds(ILogService log)
@@ -83,6 +97,8 @@ namespace Zero.Services.Save
 
         public async UniTask LoadAsync(CancellationToken ct = default)
         {
+            // Main thread, before any SwitchToThreadPool: LoadSeeds calls Resources.Load.
+            EnsureKeys();
             await _ioLock.WaitAsync(ct);
             try
             {
@@ -148,6 +164,9 @@ namespace Zero.Services.Save
 
         public async UniTask SaveAsync(CancellationToken ct = default)
         {
+            // Main thread, before any SwitchToThreadPool — WriteEnvelopeBlocking also runs
+            // on the synchronous quit path, and neither context may touch Resources.Load.
+            EnsureKeys();
             await _ioLock.WaitAsync(ct);
             try
             {

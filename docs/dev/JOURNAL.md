@@ -474,3 +474,35 @@ User's design call, and it survives scrutiny: *"trong game puzzle thì cho dù b
 - **Docs**: `guide.html` (§2 table + a new "Why nothing is critical"), `bootstrap-pipeline.md` (defaults table, API block, rationale), `crashlytics.md`, `CONTRIBUTING.md`, `PITFALLS.md`, and consumer `claude-context/architecture.md` — the last of which *still* carried the old "Crashlytics (critical — aborts on fail)" error that PR #12 fixed everywhere else. PR #12's sweep grepped `docs/` and `CONTRIBUTING.md` and missed `Samples~/`. Third time this same wrong claim has been chased down; the new test is what finally makes it self-correcting.
 - **GUIDs**: three new `.meta` files, GUIDs generated with `uuid4` and checked against all 12,196 known GUIDs in the repo + `Library/PackageCache/` — zero collisions. Per the v0.5.2 lesson, never hand-authored.
 - Verification: **Editor verification pending** — Claude cannot open Unity. CI EditMode is the gate.
+
+---
+
+## Boot in a couple of seconds — 2026-07-26 — v0.7.0
+
+User, after asking whether the steps wait for each other: *"trong game mobile puzzle không có hệ thống nào boot quá vài giây, bạn xem lại logic chỗ này xem sao."*
+
+They were right, and 0.6.0 had made it worse. All 16 steps ran sequentially with a 30s timeout × 2 attempts — a **940s worst case** — and removing the criticals in 0.6.0 deleted the only thing that used to abort early. The shipped happy path also burned 400ms on delays the mocks add for realism (`MockConsentService` 2×100ms, `MockRemoteConfigService` 200ms).
+
+**The audit is what made the redesign small.** Characterizing every step's real cost and its actual consumers found the sequential design was buying almost nothing:
+
+- **Three hard ordering edges in the entire pipeline**, all verified from call sites, not comments: `Save→Audio` (`AudioMixerService.cs:74`), `Save→Notification` (`UnityMobileNotificationService.cs:34`), `RemoteConfig→VersionCheck` (`VersionCheckService.cs:38,45,71`).
+- **Nine of sixteen steps are islands** — nothing in `Runtime/` resolves their service at all.
+- Three of the installer's ordering comments were simply false: nothing wires the bus to Crashlytics, nothing persists or reads a locale preference, nothing persists consent.
+- Boot completion triggered **one log line**. No scene load, no event, `RunAsync().Forget()` leaving nothing awaitable — so there was no handoff contract to preserve, which is what made this safe to change.
+
+**Design.** `BootstrapPhase { Blocking, Deferred }` on `IBootstrapStep`, default `Blocking` so existing consumer steps keep their semantics. Four blocking steps (Log, DeviceProfile, Save, Asset), twelve deferred. `BootstrapReady(BlockingMs)` publishes between the phases.
+
+The decision worth recording: **the deferred phase stays sequential.** Parallelizing was the obvious move and it is wrong here — the player is already in the game, so the tail costs them nothing, while sequential-in-declared-order preserves `RemoteConfig→VersionCheck` for free, needs no dependency-declaration API for a single edge, and never interleaves services that were not written for it. The change is only *where the await sits relative to "the player can go"*.
+
+**The budget, not the timeouts, is the guarantee.** Per-step timeout dropped 30s→10s, but a 5s ceiling over the whole blocking phase is what actually bounds time-to-first-screen — it holds however many blocking steps a consumer adds. On expiry, unfinished and unstarted blocking steps are recorded degraded and `BootstrapReady` fires anyway.
+
+**`ConsentStep.Timeout => TimeSpan.Zero`.** A real UMP/ATT flow shows modal UI to a human; a step timeout would cancel it mid-read. The pipeline already treated zero as "no deadline", so this needed no new machinery — and it is only safe because the step is deferred.
+
+**Two pre-existing bugs fixed, both surfaced by the audit:**
+- `AudioMixerService.InitializeAsync` had no idempotency guard — every call created a fresh `[Zero.AudioMusic]` and `[Zero.AudioSfxSource]` with `DontDestroyOnLoad` and overwrote `_mixerHandle` without disposing (`:85,103,54`). `BootstrapRetryRequested` re-runs every step, so it leaked in shipped builds.
+- `EncryptedJsonSaveService` derived keys in its **constructor**, which runs during Reflex container resolve — before step 1. In a player build with unconfigured `ZeroSecrets.asset` it threw there, bypassing the entire step machinery: no `BootstrapFailed`, no degradation, no pipeline log, just an opaque resolve error. Moved to first use so the identical exception surfaces from inside `SaveStep`.
+- **A mistake worth recording:** my first attempt put `EnsureKeys()` at the two crypto call sites — both of which run *after* `UniTask.SwitchToThreadPool()`, and `LoadSeeds` calls `Resources.Load`. `WriteEnvelopeBlocking` even documents "No Unity API". Caught it by grepping the thread-switch positions before committing; the calls moved to the main-thread entry points of `LoadAsync`/`SaveAsync`.
+
+- **Third bug, deliberately not fixed:** the eager service-ctor storm at pipeline-factory resolve (`ProjectScopeInstaller.cs:104-123`). `GameLauncher`'s `[Inject] BootstrapPipeline` constructs all 17 service ctors before step 1 logs. Fixing it properly means changing how steps obtain services — public API for consumer steps too. The only non-trivial ctor work the audit found was Save's `Resources.Load` + 2× SHA-256, which the fix above already moves out. Measure the remainder before refactoring DI.
+- **Tests**: `BootstrapPhaseTests` (9) + `BootstrapBugRegressionTests` (2), RED-first. The classification pin asserts exactly Log/DeviceProfile/Save/Asset are blocking, so the boot budget cannot silently regrow — same shape as 0.6.0's non-critical pin.
+- Verification: **Editor verification pending.** CI EditMode is the gate. Two things need a real run: the *actual* time-to-`BootstrapReady` on device (the whole point is a number), and whether `Addressables.LoadAssetAsync` self-initializes — `AssetStep` is blocking precisely so that assumption is not load-bearing for first paint.

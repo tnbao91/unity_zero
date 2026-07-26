@@ -13,6 +13,10 @@ namespace Zero.Services.Localization
     public sealed class LocalizationStep : BootstrapStepBase
     {
         public override string Name => "Localization";
+
+        // Deferred: Worst case is the player briefly seeing raw keys; LocalizedText re-renders
+        // on OnLocaleChanged.
+        public override BootstrapPhase Phase => BootstrapPhase.Deferred;
         public override bool IsCritical => false;
 
         private readonly ILogService _log;

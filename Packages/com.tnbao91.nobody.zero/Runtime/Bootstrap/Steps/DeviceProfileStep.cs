@@ -10,6 +10,9 @@ namespace Zero.Bootstrap.Steps
     {
         public override string Name => "DeviceProfile";
 
+        // Blocking — synchronous and free, and targetFrameRate wants to be set before the first frames.
+        public override BootstrapPhase Phase => BootstrapPhase.Blocking;
+
         // Failure means quality settings were not applied — the game runs at Unity's
         // defaults. That is a worse-looking game, not an unplayable one.
         public override bool IsCritical => false;

@@ -4,6 +4,37 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely; per-ph
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-07-26 — Boot in a couple of seconds
+
+### Changed
+- **The pipeline runs in two phases.** Only `Log`, `DeviceProfile`, `Save` and `Asset` are *blocking*; the other twelve steps are *deferred* and run after `BootstrapReady`, while the player is already in the game. Before this, all 16 steps sat on the critical path with a 30s timeout and 2 attempts each — a **940-second worst case** for a genre that should boot in about a second. An audit of what each step costs and what depends on it found only **three real ordering constraints** (`Save→Audio`, `Save→Notification`, `RemoteConfig→VersionCheck`) and **nine steps that nothing resolves at all**.
+- **Per-step `Timeout` default 30s → 10s.** A step that needs longer is telling you it belongs in the deferred phase.
+- **`ConsentStep.Timeout` → `TimeSpan.Zero` (no deadline).** A real UMP/ATT flow puts a modal dialog in front of a human; a step timeout would cancel it mid-read. Safe only because the step is now deferred and blocks nobody.
+- The deferred phase runs **sequentially**, not concurrently — the tail costs the player nothing, and declared order preserves `RemoteConfig→VersionCheck` for free without a dependency API.
+
+### Added
+- **`BootstrapPhase` on `IBootstrapStep`** (`Blocking` | `Deferred`). `BootstrapStepBase.Phase` defaults to `Blocking` so an existing consumer step keeps its current semantics rather than silently sliding off the boot path.
+- **`BootstrapReady(BlockingMs)`** on `IEventBus` — fires when the blocking phase ends, carrying how long the player actually waited. This is the signal to leave the splash screen; before 0.7.0 boot completion produced one log line and nothing else.
+- **A blocking-phase budget** (`BootstrapPipeline.DefaultBlockingBudget`, 5s). On expiry, unfinished and unstarted blocking steps are recorded degraded and `BootstrapReady` fires anyway. This is what actually bounds time-to-first-screen, however many blocking steps a consumer adds.
+- `BootstrapPipeline.DeferredCompletion` — observes the background phase. Nothing needs to await it to play.
+- `BootstrapPhaseTests` + `BootstrapBugRegressionTests` (~12 EditMode tests), including a classification pin so the blocking set cannot silently regrow.
+
+### Fixed
+- **`AudioMixerService.InitializeAsync` leaked a GameObject pair on every call.** No idempotency guard: each invocation created a fresh `[Zero.AudioMusic]` and `[Zero.AudioSfxSource]` with `DontDestroyOnLoad` and overwrote `_mixerHandle` without disposing it. The `BootstrapRetryRequested` path re-runs every step, so this was reachable in shipped builds.
+- **`EncryptedJsonSaveService` threw from its constructor.** In a player build with a missing or placeholder `ZeroSecrets.asset`, `LoadSeeds` threw during Reflex container resolve — before step 1, outside the pipeline — surfacing as an opaque resolve failure with no `BootstrapFailed`, no degradation and no pipeline log. Seed derivation now happens on first use, inside `SaveStep`, where it is reported like any other step failure. Same exception, same message, same fatality.
+
+### Migration
+Consumer steps keep working unchanged — `Phase` defaults to `Blocking`, which is the old behaviour. **Review your own steps and set `Phase => BootstrapPhase.Deferred` on everything the first screen does not need**; that is where the boot-time win is.
+
+To hand off to your game, subscribe `BootstrapReady` instead of guessing when the pipeline is done:
+
+```csharp
+_bus.On<BootstrapReady>().Subscribe(e => {
+    Debug.Log($"Player waited {e.BlockingMs:F0}ms");
+    LoadHomeScene();
+});
+```
+
 ## [0.6.0] — 2026-07-26 — Bootstrap never blocks the player
 
 ### Changed

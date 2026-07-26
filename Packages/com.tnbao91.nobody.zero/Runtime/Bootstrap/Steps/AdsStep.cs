@@ -9,6 +9,10 @@ namespace Zero.Bootstrap.Steps
     public sealed class AdsStep : BootstrapStepBase
     {
         public override string Name => "Ads";
+
+        // Deferred: Mediation init routinely takes 1-5s and fans out to a dozen adapter SDKs.
+        // Nothing shows an ad on the first screen.
+        public override BootstrapPhase Phase => BootstrapPhase.Deferred;
         public override bool IsCritical => false;
 
         private readonly IAdsService _ads;

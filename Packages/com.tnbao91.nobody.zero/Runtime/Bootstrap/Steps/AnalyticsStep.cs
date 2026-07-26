@@ -9,6 +9,9 @@ namespace Zero.Bootstrap.Steps
     public sealed class AnalyticsStep : BootstrapStepBase
     {
         public override string Name => "Analytics";
+
+        // Deferred: Real SDKs buffer events before init. Start it early, never await it.
+        public override BootstrapPhase Phase => BootstrapPhase.Deferred;
         public override bool IsCritical => false;
 
         private readonly IAnalyticsService _service;
