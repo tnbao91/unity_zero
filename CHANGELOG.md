@@ -20,6 +20,22 @@ All notable template-level changes are recorded here. Format follows [Keep a Cha
 ### Notes
 - `com.unity.addressables` is pinned `2.9.1` here. The `0.5.2` GUID collision only fires on Addressables **3.0.0**, which is why this repo never reproduced it locally — it surfaced in a consumer project that had upgraded.
 
+## [0.6.0] — 2026-07-26 — Bootstrap never blocks the player
+
+### Changed
+- **No shipped bootstrap step is critical any more.** `DeviceProfileStep`, `AssetStep` and `ConsentStep` were critical; all three are now non-critical. A critical failure aborts the pipeline, and since nothing in the template subscribes to `BootstrapFailed` and `LoadingScreenView` has no failure path, an abort left the player on the splash screen indefinitely. For a hybrid-casual/puzzle template that is the worst available outcome, and it could be triggered by something as minor as quality settings failing to apply.
+- `AssetStep.MaxRetries` 1 → **2** (3 attempts). A transient Addressables catalog fetch is the failure most worth retrying.
+
+### Added
+- **`IBootstrapReport`** (`Zero.Core`) — durable record of which steps degraded, so "did anything fail?" is answerable after boot. `IsHealthy`, `Degraded`, `IsDegraded(stepName)`. Registered as a singleton; impl `BootstrapReport` in `Zero.Infrastructure`. Needed because `R3EventBus` does not replay: anything constructed after boot has already missed the event.
+- **`BootstrapStepDegraded(StepName, Error, Attempts)`** — published when a step exhausts its retries, so continuing past a failure is an observable decision rather than a silent one. Previously this path only wrote a `Warn` line.
+- `BootstrapDegradationTests` — 10 EditMode tests pinning both halves of the contract: the pipeline continues, and the failure is visible. Includes a test asserting every shipped step is non-critical, so the rule cannot regress by accident.
+
+### Migration
+Nothing to change unless you relied on bootstrap aborting. If you did, two options: keep the behaviour by registering your own critical step via `BootstrapStepRegistration`, or — better — read `IBootstrapReport.IsDegraded("<step>")` in your first scene and degrade the affected feature instead of the whole launch.
+
+**`ConsentStep` going non-critical shifts an obligation onto you.** The game now runs when the consent form could not load. The legal duty is "do not track without consent", not "do not run without consent", so whatever you bind for ads / analytics / attribution must default to **non-personalized** when consent is unresolved. Gate personalization on `IBootstrapReport.IsDegraded("Consent")`.
+
 ## [0.5.2] — 2026-07-26 — GUID collision with Addressables 3.0.0
 
 ### Fixed

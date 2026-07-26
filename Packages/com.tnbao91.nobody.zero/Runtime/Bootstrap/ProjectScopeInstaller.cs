@@ -88,6 +88,12 @@ namespace Zero.Bootstrap
                 Lifetime.Singleton,
                 Resolution.Lazy);
 
+            builder.RegisterType(
+                typeof(BootstrapReport),
+                new[] { typeof(IBootstrapReport) },
+                Lifetime.Singleton,
+                Resolution.Lazy);
+
             // Fork-mode hook only (see the partial note on the class). UPM
             // consumers extend via their own OnRootContainerBuilding installer.
             InstallUserBindings(builder);
@@ -114,9 +120,15 @@ namespace Zero.Bootstrap
                 var versionCheck = c.Resolve<IVersionCheckService>();
                 var reporter = c.Resolve<IBootstrapProgressReporter>();
                 var bus = c.Resolve<IEventBus>();
+                var report = c.Resolve<IBootstrapReport>();
 
-                // Order: Crashlytics first (NOT critical — first so it can observe every
-                // later step's failure; the critical steps are DeviceProfile/Asset/Consent),
+                // NO STEP HERE IS CRITICAL, deliberately. Bootstrap must never deny the
+                // player the game: a failed step degrades a feature and the pipeline runs
+                // on. Failures are recorded in IBootstrapReport and announced as
+                // BootstrapStepDegraded. The critical mechanism still exists for consumer
+                // steps that genuinely gate the game (see BootstrapStepBase.IsCritical).
+                //
+                // Order: Crashlytics first so it can observe every later step's failure,
                 // Log/Profile next so subsequent steps
                 // can log + read device info, Save moved up so any later step can read
                 // persisted settings (audio volume, locale preference, consent state).
@@ -151,7 +163,7 @@ namespace Zero.Bootstrap
                 var steps = BootstrapStepComposer.Compose(
                     defaultSteps, c.All<BootstrapStepRegistration>());
 
-                return new BootstrapPipeline(steps, log, reporter, bus);
+                return new BootstrapPipeline(steps, log, reporter, bus, report);
             }, Lifetime.Singleton, Resolution.Lazy);
         }
 

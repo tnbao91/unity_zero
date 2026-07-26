@@ -451,3 +451,26 @@ Environment drift found in the working tree alongside the v0.5.2 hotfix, not a d
 - **The one non-cosmetic reference**: `.github/workflows/tests.yml` `unityVersion:` still pinned `6000.5.0f1` — CI would have pulled a different image than the project is stamped for. Synced along with `README.md` (badge + clone step) and `CLAUDE.md` (§Project, §Build & test); the latter two literally say "matching `ProjectSettings/ProjectVersion.txt`", so leaving them would have made the docs false about a file changed in the same commit.
 - **Package dep floor deliberately left alone.** `package.json` keeps `com.unity.purchasing: 5.3.1` and `"unity": "6000.5"`. UPM dependencies are minimums and Unity resolves upward, so raising the floor would force every consumer up for no gain.
 - Verification: statics clean (no live `6000.5.0f1` reference outside historical prose), and `tests.yml` went green on the `6000.5.5f1` image — 118/119 EditMode, which also proves the project compiles against Purchasing 5.4.2. `tests.yml` already carries a `Verify pinned Unity version matches ProjectVersion.txt` step; it is exactly what would have caught this drift, and it passed on the synced pin. **Play-mode IAP behavior under Purchasing 5.4 remains unverified** — a compile is not a purchase flow.
+
+---
+
+## Bootstrap never blocks the player — 2026-07-26 — v0.6.0
+
+User's design call, and it survives scrutiny: *"trong game puzzle thì cho dù bootstrap ở step nào cũng không được chặn user vào game."*
+
+**What made it more than a preference.** `DeviceProfileStep`, `AssetStep` and `ConsentStep` were `IsCritical => true`. A critical failure calls `Abort()` → publishes `BootstrapFailed` → `GameLauncher` writes one `Debug.LogError` → the pipeline stops. Grepped for who handles it: **nobody**. Nothing in the package subscribes to `BootstrapFailed`, and `LoadingScreenView` has no failure path at all — the "consumer loading screen surfaces retry UI" in `GameLauncher.cs:29` is work no sample provides, same gap as `UIRoot`. So "critical" in a stock project did not mean *a controlled stop*; it meant **the splash screen sits there forever**, and `DeviceProfileStep` — whose whole body is `_profile.Apply()` plus a log line — could trigger it.
+
+**The change.** All three to `IsCritical => false`, and continuing-past-failure stops being silent:
+- `IBootstrapReport` (`Zero.Core`, impl `BootstrapReport` in `Zero.Infrastructure`) — durable `IsHealthy` / `Degraded` / `IsDegraded(name)`. Needed *because* `R3EventBus` does not replay: a shop screen built after boot has already missed the event, so an event alone could not answer "is IAP up?".
+- `BootstrapStepDegraded(StepName, Error, Attempts)` — published where the pipeline previously only wrote a `Warn`.
+- `AssetStep.MaxRetries` 1 → 2. Of the three, Addressables is the one where failure is both plausible and transient.
+- The critical mechanism is untouched for consumer steps; a test pins that it still aborts.
+
+**Where I pushed back and lost, correctly.** `AssetStep` is the arguable one — if Addressables never initializes, letting the player in means letting them into a black screen. But aborting doesn't avoid that, it just relocates it to a screen with no retry button. Continuing at least puts the failure where the game has UI to explain it, and lets `LoadAsync` retry at a call site that can actually recover.
+
+**Obligation this creates.** `ConsentStep` non-critical means the game runs when the consent form failed to load. Legal duty is "don't track without consent", not "don't run without consent" — so ads/analytics/attribution adapters must default to non-personalized when `IsDegraded("Consent")`. Recorded in the CHANGELOG migration note and in the step's own comment; it is the one place this change hands the consumer a new responsibility.
+
+- **Tests**: `BootstrapDegradationTests`, 10 methods, RED-first. Includes `EveryShippedStep_IsNonCritical_SoBootstrapNeverBlocksEntry` — constructs all 16 steps with null services (no ctor guards, and `IsCritical` touches no dependency) and asserts the critical list is empty, so this cannot silently regress.
+- **Docs**: `guide.html` (§2 table + a new "Why nothing is critical"), `bootstrap-pipeline.md` (defaults table, API block, rationale), `crashlytics.md`, `CONTRIBUTING.md`, `PITFALLS.md`, and consumer `claude-context/architecture.md` — the last of which *still* carried the old "Crashlytics (critical — aborts on fail)" error that PR #12 fixed everywhere else. PR #12's sweep grepped `docs/` and `CONTRIBUTING.md` and missed `Samples~/`. Third time this same wrong claim has been chased down; the new test is what finally makes it self-correcting.
+- **GUIDs**: three new `.meta` files, GUIDs generated with `uuid4` and checked against all 12,196 known GUIDs in the repo + `Library/PackageCache/` — zero collisions. Per the v0.5.2 lesson, never hand-authored.
+- Verification: **Editor verification pending** — Claude cannot open Unity. CI EditMode is the gate.

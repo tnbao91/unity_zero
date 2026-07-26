@@ -2,7 +2,7 @@
 
 ## Overview
 
-The bootstrap pipeline is a **sequential, resilient startup sequence** that initializes all services from a single, reorderable list. Each step (Crashlytics, Save, Assets, Localization, Ads, etc.) is optional, has configurable timeout/retry/criticality, and reports progress to a `IBootstrapProgressReporter` for UI display. Steps that fail non-critically are logged but don't block launch; critical steps abort the entire pipeline — the abort publishes `BootstrapFailed` on `IEventBus` and surfaces as `BootstrapStepFailedException`, and a consumer can publish `BootstrapRetryRequested` to make `GameLauncher` re-run the pipeline (see "Failure & retry" below).
+The bootstrap pipeline is a **sequential, resilient startup sequence** that initializes all services from a single, reorderable list. Each step (Crashlytics, Save, Assets, Localization, Ads, etc.) is optional, has configurable timeout/retry/criticality, and reports progress to a `IBootstrapProgressReporter` for UI display. No shipped step is critical: a step that fails is recorded in `IBootstrapReport`, announced as `BootstrapStepDegraded`, and the pipeline runs on so the player still reaches the game. A *consumer* step that opts into `IsCritical` aborts the entire pipeline — the abort publishes `BootstrapFailed` on `IEventBus` and surfaces as `BootstrapStepFailedException`, and a consumer can publish `BootstrapRetryRequested` to make `GameLauncher` re-run the pipeline (see "Failure & retry" below).
 
 ## How the root container is built
 
@@ -22,7 +22,8 @@ public sealed class BootstrapPipeline
         IReadOnlyList<IBootstrapStep> steps,
         ILogService log,
         IBootstrapProgressReporter reporter,
-        IEventBus eventBus = null);   // publishes BootstrapFailed on critical abort
+        IEventBus eventBus = null,    // publishes BootstrapFailed / BootstrapStepDegraded
+        IBootstrapReport report = null); // durable record of degraded steps
 
     public UniTask RunAsync(IProgress<float> overallProgress, CancellationToken ct);
 }
@@ -37,6 +38,7 @@ public sealed class BootstrapStepFailedException : Exception
 
 // In Zero.Core.Events — published on IEventBus
 public readonly struct BootstrapFailed { string StepName; Exception Error; int Attempt; }
+public readonly struct BootstrapStepDegraded { string StepName; Exception Error; int Attempts; }
 public readonly struct BootstrapRetryRequested { } // publish to re-run the pipeline
 
 // In Zero.Core — consumer seam to extend the step list (see Extension Points)
@@ -64,6 +66,18 @@ public interface IBootstrapProgressReporter
 {
     Observable<float> Progress { get; }           // 0.0 to 1.0
     Observable<string> CurrentStepName { get; }   // "Loading Assets" etc.
+    void Report(float progress, string stepName); // pipeline writes; implement it in a custom reporter
+}
+
+// Durable "did anything fail?" record in Zero.Core — read this when you are asking
+// after the fact, since the bus does not replay BootstrapStepDegraded to late subscribers.
+public interface IBootstrapReport
+{
+    bool IsHealthy { get; }
+    IReadOnlyList<DegradedStep> Degraded { get; }
+    bool IsDegraded(string stepName);             // ordinal match on IBootstrapStep.Name
+    void Record(string stepName, Exception error, int attempts); // pipeline writes
+    void Clear();                                 // pipeline clears at the start of each run
 }
 ```
 
@@ -143,16 +157,20 @@ private void OnEnable()
 
 ## Step defaults (criticality / timeout / retries)
 
-Defaults shipped by the template, in pipeline order. `IsCritical` is **not** about importance — it answers "is the app unusable if this never initializes?" Ordering is a separate decision (Crashlytics runs first so later failures get reported, yet it is non-critical: aborting launch produces zero reports anyway).
+Defaults shipped by the template, in pipeline order.
+
+**No shipped step is critical** (since 0.6.0). Bootstrap must never deny the player the game — a failed step degrades a feature and the pipeline runs on, recording the failure in `IBootstrapReport` and publishing `BootstrapStepDegraded`. `BootstrapDegradationTests.EveryShippedStep_IsNonCritical_SoBootstrapNeverBlocksEntry` pins this so it cannot regress.
+
+`IsCritical` remains available for **consumer** steps that genuinely gate the game (a mandatory server login, say). It is not about importance — it answers "is the app unusable if this never initializes, *and* do I have a retry screen to show?" If the answer to the second half is no, leave it false; see "Why nothing is critical" below.
 
 | # | Step | IsCritical | Timeout | MaxRetries | Note |
 |---|---|---|---|---|---|
 | 1 | Crashlytics | false | **5s** | 1 | First for ordering; never blocks launch |
 | 2 | Log | false | 30s | 1 | |
-| 3 | DeviceProfile | **true** | 30s | 1 | Quality tiers gate everything after |
+| 3 | DeviceProfile | false | 30s | 1 | Failure = Unity default quality, not a blocked launch |
 | 4 | Save | false | 30s | 1 | Service resets-to-empty internally |
-| 5 | Asset | **true** | 30s | 1 | No game without Addressables |
-| 6 | Consent | **true** | 30s | 1 | Legal gate for ads/analytics |
+| 5 | Asset | false | 30s | **2** | Retried 3× — transient catalog fetch is worth retrying |
+| 6 | Consent | false | 30s | 1 | Failure must fall back to non-personalized |
 | 7 | RemoteConfig | false | 30s | 1 | |
 | 8 | Analytics | false | 30s | 1 | |
 | 9 | Localization | false | 30s | 1 | |
@@ -163,6 +181,27 @@ Defaults shipped by the template, in pipeline order. `IsCritical` is **not** abo
 | 14 | Time | false | 30s | 1 | |
 | 15 | Notification | false | 30s | 1 | |
 | 16 | VersionCheck | false | 30s | 1 | |
+
+### Why nothing is critical
+
+An abort has nowhere good to land. The pipeline stops, publishes `BootstrapFailed`, and `GameLauncher` writes one `Debug.LogError` — and **nothing in the template subscribes to `BootstrapFailed`**; `LoadingScreenView` has no failure path. The retry UI the design assumes is consumer work that no sample provides.
+
+So in a stock project "critical" does not mean a controlled stop. It means the splash screen sits there forever. For a hybrid-casual or puzzle game, where time-to-first-interaction decides retention, that is the worst available outcome — and pre-0.6.0 it could be triggered by "quality settings failed to apply".
+
+Continuing is not the same as swallowing. A step that exhausts its retries is recorded in `IBootstrapReport` and announced as `BootstrapStepDegraded`, so the game can switch off the feature that depends on it:
+
+```csharp
+[Inject] private IBootstrapReport _report;
+
+private void Start()
+{
+    _shopButton.gameObject.SetActive(!_report.IsDegraded("IAP"));
+}
+```
+
+Use the bus event to react at the moment of failure; use the report to ask after the fact. `R3EventBus` does not replay, so anything constructed after boot has already missed the event — which is why the durable record exists alongside it. The report is cleared at the start of every run, so a successful retry clears the degraded state.
+
+**Consent carries an obligation.** Making `ConsentStep` non-critical means the game runs when the consent form could not load. The legal duty is "do not track without consent", not "do not run without consent" — so whatever you bind for ads / analytics / attribution must default to **non-personalized** when consent is unresolved. Check `IBootstrapReport.IsDegraded("Consent")` before enabling personalization.
 
 **When you swap a real SDK into a step's service, re-review that step's `IsCritical` and `Timeout`.** Mocks return instantly, so the defaults have never been exercised against real network behavior in your project — a hanging vendor SDK consumes the full timeout on your splash screen. See PITFALLS "Swapping a real SDK into a bootstrap step".
 
@@ -218,4 +257,4 @@ public sealed class NetworkStep : BootstrapStepBase
 
 **Timeout strategy:** each step runs inside a linked CancellationTokenSource that fires `CancelAfter(step.Timeout)`. This is a soft timeout (requests to stop), not a hard kill. If a step ignores cancellation, it keeps running. In practice, most Unity async code (UniTask, Addressables) respects the token, so 30s default is safe for most network + I/O.
 
-**Retry semantics:** non-critical steps are retried up to `MaxRetries` times on any exception except `OperationCanceledException` (which always propagates as a system signal, not a step failure). Critical steps are never retried; one failure aborts the pipeline.
+**Retry semantics:** non-critical steps are retried up to `MaxRetries` times on any exception except `OperationCanceledException` (which always propagates as a system signal, not a step failure), then recorded as degraded and passed. Critical steps are never retried; one failure aborts the pipeline.

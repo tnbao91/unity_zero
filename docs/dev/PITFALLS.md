@@ -229,11 +229,11 @@ Singletons with `Resolution.Lazy` may not be constructed yet when the first Mono
 
 - Runs steps sequentially in the order declared in `ProjectScopeInstaller.InstallBindings` (consumers extend the list by registering `BootstrapStepRegistration` from their own installer — see `docs/architecture/bootstrap-pipeline.md`).
 - Wraps each step in a linked CTS that fires `CancelAfter(step.Timeout)`.
-- Retries non-critical failures up to `MaxRetries` times, then logs and continues.
+- Retries non-critical failures up to `MaxRetries` times, then records them in `IBootstrapReport`, publishes `BootstrapStepDegraded`, and continues.
 - Aborts on critical failure or timeout: publishes `BootstrapFailed {StepName, Error, Attempt}` on `IEventBus`, then throws `BootstrapStepFailedException` (inner = original failure). Outer-token cancellation propagates raw — it is a system signal, not a failure.
 - Forwards per-step progress through `IBootstrapProgressReporter` (Singleton in `Zero.Infrastructure`).
 
-When adding a step: extend `BootstrapStepBase`, override `Name`, set `IsCritical` only when the app cannot launch without it (currently `AssetStep`, `ConsentStep`, `DeviceProfileStep`), and override `Timeout` for network-bound steps.
+When adding a step: extend `BootstrapStepBase`, override `Name`, leave `IsCritical` false (no shipped step is critical — an abort lands on a splash screen with no retry UI; see bootstrap-pipeline.md §"Why nothing is critical"), and override `Timeout` for network-bound steps.
 
 **Steps must be idempotent.** `BootstrapRetryRequested` re-runs the *whole* pipeline — there is no completed-step tracking, so steps that already succeeded run again. Guard one-time side effects inside the service (`if (_initialized) return;`), not in the step; a step that double-subscribes events or re-schedules notifications on the second pass corrupts state precisely in the failure-recovery path where users are already annoyed.
 

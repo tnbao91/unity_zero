@@ -104,6 +104,6 @@ private void OnPurchaseFailed(Exception ex, string productId)
 
 ## Design Rationale
 
-- **`CrashlyticsStep` runs first but is *not* critical** (`IsCritical => false`) — telemetry is foundational for diagnosis, so it initializes before anything else can throw, but a game that boots without crash reporting is still a game. Failing to init must not cost the player their session. It is also the only step that shortens the 30s default timeout, to 5s: a telemetry SDK that hasn't answered in 5s is not worth stalling the splash screen for. The critical steps — the ones that abort bootstrap — are `DeviceProfileStep`, `AssetStep` and `ConsentStep`.
+- **`CrashlyticsStep` runs first but is *not* critical** (`IsCritical => false`) — telemetry is foundational for diagnosis, so it initializes before anything else can throw, but a game that boots without crash reporting is still a game. Failing to init must not cost the player their session. It is also the only step that shortens the 30s default timeout, to 5s: a telemetry SDK that hasn't answered in 5s is not worth stalling the splash screen for. Since 0.6.0 *no* shipped step is critical, for the same reason generalized: bootstrap never denies the player the game.
 - **Mock writes to Debug.Log** rather than no-op so dev work surfaces "what would be sent". A silent mock is hard to verify.
 - **Single `RecordException` overload** rather than separate `RecordHandled` / `RecordFatal` — most SDKs treat the distinction via metadata; keep the interface narrow.

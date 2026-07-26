@@ -9,7 +9,10 @@ namespace Zero.Bootstrap.Steps
     public sealed class DeviceProfileStep : BootstrapStepBase
     {
         public override string Name => "DeviceProfile";
-        public override bool IsCritical => true;
+
+        // Failure means quality settings were not applied — the game runs at Unity's
+        // defaults. That is a worse-looking game, not an unplayable one.
+        public override bool IsCritical => false;
 
         private readonly IDeviceProfileService _profile;
         private readonly ILogService _log;
