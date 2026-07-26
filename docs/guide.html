@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zero — Flow &amp; Setup Guide</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-soft: #f6f7f9;
+    --bg-inset: #eceef1;
+    --fg: #16181d;
+    --fg-dim: #5b616e;
+    --line: #dfe2e7;
+    --accent: #2f6feb;
+    --crit: #c2410c;
+    --crit-bg: #fff3ec;
+    --ok: #15803d;
+    --warn-bg: #fff8e6;
+    --warn-line: #e0b64a;
+    --danger-bg: #fdeeee;
+    --danger-line: #d05a5a;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --bg-soft: #1b1e24;
+      --bg-inset: #23272e;
+      --fg: #e6e8ec;
+      --fg-dim: #9aa1ad;
+      --line: #2e333b;
+      --accent: #6ea0ff;
+      --crit: #ff9d6b;
+      --crit-bg: #33231a;
+      --ok: #66c98a;
+      --warn-bg: #2e2716;
+      --warn-line: #8a6f2a;
+      --danger-bg: #331d1d;
+      --danger-line: #8a4444;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 60rem; margin: 0 auto; padding: 2.5rem 1.25rem 6rem; }
+
+  h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 .35rem; letter-spacing: -.02em; }
+  h2 {
+    font-size: 1.3rem; margin: 3.5rem 0 1rem; padding-top: 1.25rem;
+    border-top: 1px solid var(--line); letter-spacing: -.01em;
+  }
+  h3 { font-size: 1.02rem; margin: 2rem 0 .6rem; }
+  p, li { color: var(--fg); }
+  .lede { color: var(--fg-dim); font-size: 1.05rem; margin: 0 0 1.5rem; }
+  a { color: var(--accent); }
+
+  code {
+    font-family: var(--mono); font-size: .875em;
+    background: var(--bg-inset); padding: .12em .38em; border-radius: 4px;
+  }
+  pre {
+    background: var(--bg-soft); border: 1px solid var(--line); border-radius: 8px;
+    padding: .9rem 1rem; overflow-x: auto; font-size: .82rem; line-height: 1.55;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+
+  .note, .warn, .danger {
+    border-left: 3px solid var(--line); background: var(--bg-soft);
+    padding: .8rem 1rem; border-radius: 0 6px 6px 0; margin: 1.25rem 0;
+  }
+  .warn { background: var(--warn-bg); border-left-color: var(--warn-line); }
+  .danger { background: var(--danger-bg); border-left-color: var(--danger-line); }
+  .note p:first-child, .warn p:first-child, .danger p:first-child { margin-top: 0; }
+  .note p:last-child, .warn p:last-child, .danger p:last-child { margin-bottom: 0; }
+
+  .scroll { overflow-x: auto; margin: 1.25rem 0; }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; min-width: 34rem; }
+  th, td { text-align: left; padding: .5rem .7rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-weight: 600; color: var(--fg-dim); font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }
+  tbody tr:hover { background: var(--bg-soft); }
+
+  .tag {
+    display: inline-block; font-size: .7rem; font-weight: 600; letter-spacing: .03em;
+    padding: .1rem .4rem; border-radius: 4px; border: 1px solid var(--line);
+    color: var(--fg-dim); white-space: nowrap;
+  }
+  .tag-crit { color: var(--crit); border-color: var(--crit); background: var(--crit-bg); }
+  .tag-real { color: var(--ok); border-color: var(--ok); }
+
+  figure { margin: 1.5rem 0; }
+  figure svg { display: block; width: 100%; height: auto; }
+  figcaption { color: var(--fg-dim); font-size: .82rem; margin-top: .5rem; }
+
+  .svg-label { font: 600 11px var(--mono); fill: var(--fg); }
+  .svg-sub { font: 10px var(--mono); fill: var(--fg-dim); }
+  .svg-box { fill: var(--bg-soft); stroke: var(--line); }
+  .svg-box-crit { fill: var(--crit-bg); stroke: var(--crit); }
+  .svg-line { stroke: var(--line); fill: none; }
+
+  .toc { background: var(--bg-soft); border: 1px solid var(--line); border-radius: 8px; padding: 1rem 1.25rem; }
+  .toc ol { margin: .4rem 0 0; padding-left: 1.2rem; }
+  .toc li { margin: .18rem 0; font-size: .92rem; }
+
+  .src { color: var(--fg-dim); font-size: .8rem; font-family: var(--mono); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Zero — Flow &amp; Setup Guide</h1>
+<p class="lede">
+  <code>com.tnbao91.nobody.zero</code> — an opinionated Unity 6 LTS template for hybrid-casual and puzzle games.
+  This page describes what actually happens at runtime and exactly how to stand the template up in your own project.
+</p>
+
+<div class="note">
+  <p><strong>Every fact on this page was read out of the code, not out of the prose docs.</strong> Where a
+  behaviour is surprising, the source line is cited. If this page and a Markdown doc disagree, trust the code
+  and file an issue — several docs were wrong about the pipeline until the review that produced this page.</p>
+</div>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#what">What Zero is — and is not</a></li>
+    <li><a href="#boot">The boot flow</a></li>
+    <li><a href="#map">Assembly map</a></li>
+    <li><a href="#setup">Setup, step by step</a></li>
+    <li><a href="#milestones">Two honest milestones</a></li>
+    <li><a href="#extend">Extending it</a></li>
+    <li><a href="#keys">Addressables key conventions</a></li>
+    <li><a href="#services">Service catalogue</a></li>
+    <li><a href="#bus">The event bus</a></li>
+  </ol>
+</div>
+
+<h2 id="what">1. What Zero is — and is not</h2>
+
+<p>
+  Zero is the layer between "empty Unity project" and "your game": dependency injection, an ordered async
+  bootstrap, ~24 service seams, a popup/screen/toast stack, and a save system that actually encrypts. It ships
+  as a UPM package; your game lives outside it.
+</p>
+
+<p><strong>Three constraints worth knowing before you adopt it:</strong></p>
+
+<ul>
+  <li><strong>It is genre-agnostic on purpose.</strong> <code>Zero.Gameplay</code> ships a state machine, a level
+    loader and lifecycle events — nothing else. Grid, runner, idle, merge and match-3 systems are yours to write,
+    in your own assembly.</li>
+  <li><strong>You own the scenes and the UI roots.</strong> Only <code>Bootstrap.unity</code> is in build settings.
+    The framework never spawns a canvas; you attach a <code>UIRoot</code> component with four Transform slots and
+    it wires itself in.</li>
+  <li><strong>Third-party SDKs are mocks.</strong> Analytics, ads, IAP, attribution, consent, crash reporting and
+    remote config all ship as <code>Mock…Service</code> implementations that log what they <em>would</em> send.
+    You swap the binding per game. The only real implementations wrap packages Unity itself ships.</li>
+</ul>
+
+<p>
+  The stack is fixed and not up for substitution: <strong>Reflex</strong> (DI), <strong>UniTask</strong> (async),
+  <strong>R3</strong> (reactive), <strong>LitMotion</strong> (tweening), <strong>Newtonsoft.Json</strong>,
+  <strong>ZString</strong>.
+</p>
+
+<h2 id="boot">2. The boot flow</h2>
+
+<p>
+  There is no <code>ProjectContext</code> prefab and no scene-based composition root. Wiring is code:
+</p>
+
+<figure>
+<svg viewBox="0 0 720 200" role="img" aria-label="Boot sequence: RuntimeInitializeOnLoadMethod hooks the root container build, which installs bindings, then GameLauncher runs the pipeline in Start.">
+  <rect class="svg-box" x="2" y="34" width="150" height="52" rx="6"/>
+  <text class="svg-label" x="14" y="56">ProjectScopeInstaller</text>
+  <text class="svg-sub" x="14" y="72">BeforeSplashScreen</text>
+
+  <path class="svg-line" d="M152 60 H190" marker-end="url(#a)"/>
+
+  <rect class="svg-box" x="192" y="34" width="150" height="52" rx="6"/>
+  <text class="svg-label" x="204" y="56">Root container</text>
+  <text class="svg-sub" x="204" y="72">24 installers run</text>
+
+  <path class="svg-line" d="M342 60 H380" marker-end="url(#a)"/>
+
+  <rect class="svg-box" x="382" y="34" width="150" height="52" rx="6"/>
+  <text class="svg-label" x="394" y="56">GameLauncher</text>
+  <text class="svg-sub" x="394" y="72">Start() — injected</text>
+
+  <path class="svg-line" d="M532 60 H570" marker-end="url(#a)"/>
+
+  <rect class="svg-box" x="572" y="34" width="146" height="52" rx="6"/>
+  <text class="svg-label" x="584" y="56">BootstrapPipeline</text>
+  <text class="svg-sub" x="584" y="72">16 steps, async</text>
+
+  <rect class="svg-box" x="192" y="120" width="150" height="46" rx="6"/>
+  <text class="svg-sub" x="204" y="140">consumer installers</text>
+  <text class="svg-sub" x="204" y="155">BeforeSceneLoad</text>
+  <path class="svg-line" d="M267 120 V96" marker-end="url(#a)"/>
+  <text class="svg-sub" x="278" y="112">registers later → wins</text>
+
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="currentColor" style="color: var(--fg-dim)"/>
+    </marker>
+  </defs>
+</svg>
+<figcaption>
+  <code>ProjectScopeInstaller.Hook()</code> is <code>[RuntimeInitializeOnLoadMethod(BeforeSplashScreen)]</code> and
+  subscribes to <code>ContainerScope.OnRootContainerBuilding</code>. Consumer installers hook at
+  <code>BeforeSceneLoad</code> — strictly later — and Reflex resolves the <em>last</em> registration for a contract.
+  That ordering is the entire override mechanism.
+</figcaption>
+</figure>
+
+<h3>The 16 steps</h3>
+
+<p>
+  Order is the literal <code>defaultSteps</code> array in <code class="src">ProjectScopeInstaller.cs:125-143</code>.
+  Names are the <code>Name</code> property on each step — you need the exact string to anchor your own step against one.
+</p>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>#</th><th>Step</th><th><code>Name</code></th><th>Critical</th><th>Timeout</th><th>Why here</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td><code>CrashlyticsStep</code></td><td><code>"Crashlytics"</code></td><td><span class="tag">no</span></td><td><strong>5s</strong></td><td>First so it can observe every later failure. Not critical — a game that boots without crash reporting is still a game.</td></tr>
+    <tr><td>2</td><td><code>LogStep</code></td><td><code>"Log"</code></td><td><span class="tag">no</span></td><td>30s</td><td>Later steps can log.</td></tr>
+    <tr><td>3</td><td><code>DeviceProfileStep</code></td><td><code>"DeviceProfile"</code></td><td><span class="tag tag-crit">CRITICAL</span></td><td>30s</td><td>Gates the quality tier everything after it reads.</td></tr>
+    <tr><td>4</td><td><code>SaveStep</code></td><td><code>"Save"</code></td><td><span class="tag">no</span></td><td>30s</td><td>Moved up so later steps can read persisted settings (volume, locale, consent).</td></tr>
+    <tr><td>5</td><td><code>AssetStep</code></td><td><code>"Asset"</code></td><td><span class="tag tag-crit">CRITICAL</span></td><td>30s</td><td>No Addressables, no game.</td></tr>
+    <tr><td>6</td><td><code>ConsentStep</code></td><td><code>"Consent"</code></td><td><span class="tag tag-crit">CRITICAL</span></td><td>30s</td><td>Legal gate — must resolve before anything tracks the user.</td></tr>
+    <tr><td>7</td><td><code>RemoteConfigStep</code></td><td><code>"RemoteConfig"</code></td><td><span class="tag">no</span></td><td>30s</td><td></td></tr>
+    <tr><td>8</td><td><code>AnalyticsStep</code></td><td><code>"Analytics"</code></td><td><span class="tag">no</span></td><td>30s</td><td></td></tr>
+    <tr><td>9</td><td><code>LocalizationStep</code></td><td><code>"Localization"</code></td><td><span class="tag">no</span></td><td>30s</td><td>UI text ready before anything surfaces a localized error.</td></tr>
+    <tr><td>10</td><td><code>AttributionStep</code></td><td><code>"Attribution"</code></td><td><span class="tag">no</span></td><td>30s</td><td></td></tr>
+    <tr><td>11</td><td><code>AdsStep</code></td><td><code>"Ads"</code></td><td><span class="tag">no</span></td><td>30s</td><td></td></tr>
+    <tr><td>12</td><td><code>IapStep</code></td><td><code>"IAP"</code></td><td><span class="tag">no</span></td><td>30s</td><td></td></tr>
+    <tr><td>13</td><td><code>AudioStep</code></td><td><code>"Audio"</code></td><td><span class="tag">no</span></td><td>30s</td><td></td></tr>
+    <tr><td>14</td><td><code>TimeStep</code></td><td><code>"Time"</code></td><td><span class="tag">no</span></td><td>30s</td><td></td></tr>
+    <tr><td>15</td><td><code>NotificationStep</code></td><td><code>"Notification"</code></td><td><span class="tag">no</span></td><td>30s</td><td></td></tr>
+    <tr><td>16</td><td><code>VersionCheckStep</code></td><td><code>"VersionCheck"</code></td><td><span class="tag">no</span></td><td>30s</td><td></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="warn">
+  <p><strong><code>CrashlyticsStep</code> is not critical.</strong> Several docs in this repo said it was the
+  <em>only</em> critical step, for a long time. It is <code>IsCritical =&gt; false</code>
+  (<code class="src">Steps/CrashlyticsStep.cs:17</code>). The three that abort bootstrap are
+  <strong>DeviceProfile, Asset and Consent</strong>. If you copied the old claim into your own notes, fix it there too.</p>
+</div>
+
+<h3>Failure, retry and timeout</h3>
+
+<p>Read from <code class="src">BootstrapPipeline.cs:48-91</code>:</p>
+
+<ul>
+  <li><strong>Attempts</strong> are <code>MaxRetries + 1</code> — <code>MaxRetries</code> counts <em>additional</em>
+    tries, and defaults to 1, so a step runs twice before giving up.</li>
+  <li><strong>A critical step never retries.</strong> The first failure calls <code>Abort()</code>, which throws
+    <code>BootstrapStepFailedException</code> and publishes <code>BootstrapFailed</code> on the bus with the step
+    name, the error and the attempt number.</li>
+  <li><strong>A non-critical step retries, then is swallowed.</strong> After exhausting attempts the pipeline logs
+    <code>"exhausted retries; continuing"</code> and moves on. Your game boots with that service degraded.</li>
+  <li><strong>Timeout is cooperative, not a kill.</strong> Each attempt runs under a linked
+    <code>CancellationTokenSource</code> with <code>CancelAfter(step.Timeout)</code>. A step that ignores its token
+    keeps running — the pipeline just stops waiting. UniTask and Addressables both respect it.</li>
+  <li><strong>Outer cancellation always wins</strong> and is never retried.</li>
+</ul>
+
+<p>
+  Retry is consumer-triggerable: publish <code>BootstrapRetryRequested</code> and <code>GameLauncher</code> re-runs
+  <code>RunAsync()</code>. There is no completed-step tracking, so <strong>every step runs again</strong> — steps must
+  be idempotent. Guard one-time side effects inside the service (<code>if (_initialized) return;</code>), not in the step.
+</p>
+
+<h3>Progress</h3>
+
+<p>
+  Views read <code>IBootstrapProgressReporter</code>, never the pipeline. It exposes
+  <code>Observable&lt;float&gt; Progress</code>, <code>Observable&lt;string&gt; CurrentStepName</code>, and
+  — often missed when writing a custom reporter — a <code>void Report(float, string)</code> the pipeline calls.
+</p>
+
+<p>
+  Both the reporter and the pipeline are <code>Lifetime.Singleton, Resolution.Lazy</code>. The reason to inject the
+  reporter is not availability, it is blast radius: resolving <code>BootstrapPipeline</code> constructs all 16 steps
+  and every service they depend on. A loading bar should not trigger that.
+</p>
+
+<h2 id="map">3. Assembly map</h2>
+
+<figure>
+<svg viewBox="0 0 720 320" role="img" aria-label="Layered assembly map: Zero.Core at the base, then Zero.Infrastructure, then 22 service assemblies, then three peer assemblies that never reference each other, with Zero.Bootstrap composing all of them.">
+  <rect class="svg-box" x="2" y="266" width="716" height="46" rx="6"/>
+  <text class="svg-label" x="16" y="288">Zero.Core</text>
+  <text class="svg-sub" x="16" y="303">interfaces + POCOs only — references UniTask, nothing internal</text>
+
+  <rect class="svg-box" x="2" y="208" width="716" height="46" rx="6"/>
+  <text class="svg-label" x="16" y="230">Zero.Infrastructure</text>
+  <text class="svg-sub" x="16" y="245">BootstrapStepBase · BootstrapProgressReporter · Util.SafeDestroy</text>
+
+  <rect class="svg-box" x="2" y="150" width="716" height="46" rx="6"/>
+  <text class="svg-label" x="16" y="172">Zero.Services.* &nbsp;— 22 assemblies, one per service</text>
+  <text class="svg-sub" x="16" y="187">each references Core + Infrastructure; only VersionCheck also references Services.Events</text>
+
+  <rect class="svg-box" x="2" y="80" width="230" height="58" rx="6"/>
+  <text class="svg-label" x="16" y="102">Zero.Gameplay</text>
+  <text class="svg-sub" x="16" y="118">state machine · level loader</text>
+
+  <rect class="svg-box" x="245" y="80" width="230" height="58" rx="6"/>
+  <text class="svg-label" x="259" y="102">Zero.Meta</text>
+  <text class="svg-sub" x="259" y="118">empty placeholder — yours to fill</text>
+
+  <rect class="svg-box" x="488" y="80" width="230" height="58" rx="6"/>
+  <text class="svg-label" x="502" y="102">Zero.UI</text>
+  <text class="svg-sub" x="502" y="118">popups · screens · toasts</text>
+
+  <text class="svg-sub" x="234" y="114" style="fill: var(--crit)">✕</text>
+  <text class="svg-sub" x="477" y="114" style="fill: var(--crit)">✕</text>
+
+  <rect class="svg-box" x="2" y="14" width="716" height="52" rx="6"/>
+  <text class="svg-label" x="16" y="36">Zero.Bootstrap</text>
+  <text class="svg-sub" x="16" y="52">the only assembly that sees all three peers — composition root</text>
+</svg>
+<figcaption>
+  Peers never reference each other — the <span style="color:var(--crit)">✕</span> marks are enforced, not advisory.
+  Cross-tier communication goes through <code>IEventBus</code>. <code>Zero.DevTools</code> sits outside this stack with
+  <code>defineConstraints: ["UNITY_EDITOR || DEVELOPMENT_BUILD"]</code>, so it vanishes from production builds entirely.
+</figcaption>
+</figure>
+
+<div class="note">
+  <p><strong>One documented exception worth knowing.</strong> <code>Zero.UI</code> loads its prefabs through
+  <code>Unity.Addressables</code> <em>directly</em> — it has no <code>Zero.Services.Asset</code> reference. Everywhere
+  else the rule is "nothing calls Addressables directly, go through <code>IAssetService</code>". If you go looking for
+  the <code>IAssetService</code> call in <code>UIService</code>, it isn't there; <code>UIService</code>,
+  <code>ScreenManager</code> and <code>ToastQueue</code> each own their handle lifetime.</p>
+</div>
+
+<h2 id="setup">4. Setup, step by step</h2>
+
+<h3>Step 1 — scoped registries</h3>
+<p>Add to your project's <code>Packages/manifest.json</code>:</p>
+<pre><code>"scopedRegistries": [
+  {
+    "name": "OpenUPM",
+    "url": "https://package.openupm.com",
+    "scopes": [
+      "com.cysharp",
+      "com.gustavopsantos",
+      "com.annulusgames",
+      "com.tnbao91",
+      "com.github-glitchenzo"
+    ]
+  }
+]</code></pre>
+
+<h3>Step 2 — NuGetForUnity, before Zero</h3>
+<p>
+  Package Manager → <strong>+</strong> → <em>Add package by name</em> → <code>com.github-glitchenzo.nugetforunity</code>.
+  This is a prerequisite, not an optional extra: R3 needs four BCL DLLs that only NuGet can fetch.
+</p>
+
+<h3>Step 3 — install Zero</h3>
+<pre><code>openupm add com.tnbao91.nobody.zero</code></pre>
+<p>Or <em>Add package by name</em> → <code>com.tnbao91.nobody.zero</code>.</p>
+<p class="src">Pin 0.2.1 or later — tags v0.1.0 and v0.2.0 are broken (a .gitignore collision dropped Runtime/Services/Log/ from the package).</p>
+
+<h3>Step 4 — import the Bootstrap Scene sample</h3>
+<p>
+  Package Manager → <strong>Zero — Hybrid Casual Template</strong> → Samples → <strong>Import</strong> next to
+  "Bootstrap Scene". Files land in <code>Assets/Samples/com.tnbao91.nobody.zero/&lt;version&gt;/BootstrapScene/</code>.
+  Then, by hand:
+</p>
+<ul>
+  <li>Move <code>Bootstrap.unity</code> to your scenes folder and add it to Build Settings.</li>
+  <li>Move <code>ReflexSettings.asset</code> to <code>Assets/Resources/ReflexSettings.asset</code>. Its root-scopes
+    list is <em>intentionally empty</em> — wiring is code, not data.</li>
+  <li>Copy <code>packages.config</code> to <code>Assets/packages.config</code>, then NuGet menu →
+    <strong>Restore Packages</strong>.</li>
+</ul>
+<p>
+  The sample also contains a <code>link.xml</code>. No setup step currently tells you where to put it — if you strip
+  assemblies on IL2CPP, merge its entries into your own <code>Assets/link.xml</code>.
+</p>
+
+<h3>Step 5 — save encryption seeds</h3>
+<p>
+  Copy <code>ZeroSecrets.asset.example</code> to <code>Assets/Resources/ZeroSecrets.asset</code>, open it, and replace
+  both <code>_aesSeed</code> and <code>_hmacSeed</code>. Both ship as the literal string
+  <code>REPLACE_BEFORE_SHIPPING</code>.
+</p>
+
+<div class="danger">
+  <p><strong>Player builds throw <code>InvalidOperationException</code> at startup</strong> if either seed is still the
+  placeholder. The Editor only warns, so iteration is not blocked — which means it is entirely possible to develop for
+  weeks and discover this in your first device build. Do it now. The file is gitignored; keep the values in your
+  team's secret manager.</p>
+</div>
+
+<h3>Step 6 — press Play</h3>
+<p>
+  Open <code>Bootstrap.unity</code> → Play. The Console prints <code>[Bootstrap] Step N/16: …</code> for each step.
+  If you see 16 lines and no red, the template is correctly installed.
+</p>
+
+<h2 id="milestones">5. Two honest milestones</h2>
+
+<p>
+  It is worth being precise about what the shipped sample gets you, because the gap between the two milestones
+  below is where adopters lose an afternoon.
+</p>
+
+<h3><span class="tag tag-real">reachable</span> Bootstrap running — about 15 minutes</h3>
+<p>
+  Steps 1–6 above and nothing else. Every third-party service defaults to a mock, so nothing needs credentials,
+  and <code>AssetStep</code> initializes the Addressables runtime without requiring any content to exist. You get
+  a booted container and 16 green log lines.
+</p>
+
+<h3><span class="tag">not reachable from the sample</span> A popup on screen — add 30–60 minutes</h3>
+<p>
+  The Bootstrap scene contains a camera and a splash background. There is <strong>no <code>UIRoot</code>, no canvas
+  hierarchy, no popup prefab, and no Addressables group</strong> anywhere in the template, and no sample demonstrates
+  them. To get one popup up you must:
+</p>
+<ol>
+  <li>Create a scene with a <code>[UI]</code> GameObject and four child canvases —
+    <code>[UI.Hud]</code> (sortOrder 100), <code>[UI.Popup]</code> (200), <code>[UI.Overlay]</code> (300),
+    <code>[UI.System]</code> (400).</li>
+  <li>Add the <code>UIRoot</code> component and drag those four Transforms into its slots.</li>
+  <li>Write a popup deriving from <code>PopupBase&lt;TData, TResult&gt;</code> and build a prefab from it.</li>
+  <li>Create an Addressables group and mark the prefab addressable at exactly
+    <code>ui/popup/&lt;your class name, lowercased&gt;</code>.</li>
+  <li>Resolve <code>IUIService</code> and call <code>PushAsync&lt;TPopup, TData, TResult&gt;(…)</code>.</li>
+</ol>
+<p>The full canvas recipe is in <a href="ui/ui-root.md"><code>docs/ui/ui-root.md</code></a>.</p>
+
+<h2 id="extend">6. Extending it</h2>
+
+<h3>Swapping a service implementation</h3>
+<p>
+  From your own assembly, hook the root container build. Because the package hooks at
+  <code>BeforeSplashScreen</code> and you hook at <code>BeforeSceneLoad</code>, your registration lands later and
+  Reflex resolves the last one.
+</p>
+<pre><code>public static class MyGameInstaller
+{
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    private static void Hook()
+        =&gt; ContainerScope.OnRootContainerBuilding += Install;
+
+    private static void Install(ContainerBuilder builder)
+    {
+        builder.RegisterType(
+            typeof(FirebaseAnalyticsService),
+            new[] { typeof(IAnalyticsService) },
+            Lifetime.Singleton,
+            Resolution.Lazy);
+    }
+}</code></pre>
+
+<div class="danger">
+  <p><strong>Do not try to extend via the <code>partial</code> seam.</strong> <code>ProjectScopeInstaller</code> is a
+  partial class with an <code>InstallUserBindings</code> hook, and it works only if you forked the repo. C# partials
+  must live in the same assembly, and a UPM consumer's package folder is read-only — you cannot add a file to it. The
+  two real seams are <code>OnRootContainerBuilding</code> and <code>BootstrapStepRegistration</code>.</p>
+</div>
+
+<h3>Adding your own bootstrap step</h3>
+<p>
+  Subclass <code>BootstrapStepBase</code> and override <code>OnExecuteAsync</code> — the protected one.
+  <code>ExecuteAsync</code> is the base's, and it brackets your work with <code>progress.Report(0f)</code> /
+  <code>Report(1f)</code>.
+</p>
+<pre><code>builder.RegisterFactory&lt;BootstrapStepRegistration&gt;(
+    c =&gt; new BootstrapStepRegistration(
+            new MyLiveOpsStep(c.Resolve&lt;IRemoteConfigService&gt;()),
+            BootstrapStepAnchor.After,
+            "RemoteConfig"),
+    new[] { typeof(BootstrapStepRegistration) },
+    Lifetime.Singleton,
+    Resolution.Lazy);</code></pre>
+<p>
+  Anchors are <code>Append</code>, <code>Before</code>, <code>After</code> and <code>Replace</code>. The anchor name
+  is matched against <code>IBootstrapStep.Name</code> with <code>StringComparison.Ordinal</code> and
+  <strong>throws <code>ArgumentException</code> if not found</strong> — a typo fails loudly at startup rather than
+  silently dropping your step. Use the exact strings from the table in §2.
+</p>
+
+<h3>Compile-time mock swap</h3>
+<p>
+  Three services ship both a real and a mock implementation, selected by a define symbol rather than a binding —
+  useful for headless test runs and CI:
+</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>Define</th><th>Real (default)</th><th>Mock (when defined)</th></tr></thead>
+  <tbody>
+    <tr><td><code>ZERO_USE_MOCK_AUDIO</code></td><td><code>AudioMixerService</code></td><td><code>MockAudioService</code></td></tr>
+    <tr><td><code>ZERO_USE_MOCK_INPUT</code></td><td><code>UnityInputService</code></td><td><code>MockInputService</code></td></tr>
+    <tr><td><code>ZERO_USE_MOCK_NOTIFICATION</code></td><td><code>UnityMobileNotificationService</code></td><td><code>MockNotificationService</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="keys">7. Addressables key conventions</h2>
+
+<p>
+  The UI stack builds its keys by convention — nothing is registered, so a mismatch surfaces as a missing asset at
+  runtime, not a compile error. These strings come from the source, not the docs:
+</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>What</th><th>Key</th><th>Built at</th></tr></thead>
+  <tbody>
+    <tr><td>Popup prefab</td><td><code>ui/popup/{typeof(TPopup).Name.ToLowerInvariant()}</code></td><td class="src">UIService.cs:152</td></tr>
+    <tr><td>Screen prefab</td><td><code>ui/screen/{typeof(TScreen).Name.ToLowerInvariant()}</code></td><td class="src">ScreenManager.cs:42</td></tr>
+    <tr><td>Toast prefab</td><td><code>ui/toast/default</code> — fixed, one prefab for all toasts</td><td class="src">ToastQueue.cs:21</td></tr>
+    <tr><td>Audio mixer</td><td><code>audio/main_mixer</code></td><td class="src">docs/services/audio.md</td></tr>
+    <tr><td>Music / SFX clips</td><td><code>audio/music/&lt;name&gt;</code> · <code>audio/sfx/&lt;name&gt;</code></td><td class="src">docs/services/audio.md</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="warn">
+  <p><strong>Class name, lowercased — including the suffix.</strong> A popup class <code>SettingsPopup</code> needs the
+  key <code>ui/popup/settingspopup</code>, not <code>ui/popup/settings</code>. Rename the class and the key silently
+  stops matching.</p>
+</div>
+
+<h2 id="services">8. Service catalogue</h2>
+
+<p>
+  24 bindings, registered in <code class="src">ProjectScopeInstaller.InstallBindings</code>. <span class="tag tag-real">real</span>
+  means it works as shipped; <span class="tag">mock</span> means it logs what it would do and needs a real adapter before
+  you ship.
+</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Contract</th><th>Implementation</th><th>Kind</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>ILogService</code></td><td><code>LogService</code></td><td><span class="tag tag-real">real</span></td><td>Debug.Log wrapper with a single on/off switch.</td></tr>
+    <tr><td><code>IEventBus</code></td><td><code>R3EventBus</code></td><td><span class="tag tag-real">real</span></td><td>Type-keyed pub/sub connecting the peer tiers.</td></tr>
+    <tr><td><code>IDeviceProfileService</code></td><td><code>DeviceProfileService</code></td><td><span class="tag tag-real">real</span></td><td>Classifies the device Low/Mid/High and applies quality settings.</td></tr>
+    <tr><td><code>ISaveService</code></td><td><code>EncryptedJsonSaveService</code></td><td><span class="tag tag-real">real</span></td><td>AES-256-CBC + HMAC-SHA256 JSON persistence; tamper resets.</td></tr>
+    <tr><td><code>IAssetService</code></td><td><code>AddressableAssetService</code></td><td><span class="tag tag-real">real</span></td><td>Addressables wrapper with tracked disposable handles.</td></tr>
+    <tr><td><code>ISceneService</code></td><td><code>AddressableSceneService</code></td><td><span class="tag tag-real">real</span></td><td>Addressables scene load/unload with R3 streams.</td></tr>
+    <tr><td><code>IL10nService</code></td><td><code>UnityLocalizationService</code></td><td><span class="tag tag-real">real</span></td><td>Wraps <code>com.unity.localization</code>; fails safe on unknown keys.</td></tr>
+    <tr><td><code>IPoolService</code></td><td><code>UnityPoolService</code></td><td><span class="tag tag-real">real</span></td><td>Per-prefab pooling over <code>UnityEngine.Pool</code>.</td></tr>
+    <tr><td><code>IAudioService</code></td><td><code>AudioMixerService</code></td><td><span class="tag tag-real">real</span></td><td>Mixer bus routing, music crossfade, SFX pooling.</td></tr>
+    <tr><td><code>IInputService</code></td><td><code>UnityInputService</code></td><td><span class="tag tag-real">real</span></td><td>Input System + EnhancedTouch → tap / swipe / pinch / back.</td></tr>
+    <tr><td><code>INotificationService</code></td><td><code>UnityMobileNotificationService</code></td><td><span class="tag tag-real">real</span></td><td>Local notifications, iOS + Android, permission caching.</td></tr>
+    <tr><td><code>IUIService</code></td><td><code>UIService</code></td><td><span class="tag tag-real">real</span></td><td>Popup stack, screens and toasts over your <code>UIRoot</code>.</td></tr>
+    <tr><td><code>IVersionCheckService</code></td><td><code>VersionCheckService</code></td><td><span class="tag tag-real">real</span></td><td>Compares <code>Application.version</code> against remote-config gates.</td></tr>
+    <tr><td><code>IAdPlacementService</code></td><td><code>DefaultAdPlacementService</code></td><td><span class="tag tag-real">real</span></td><td>Frequency caps and cooldowns above whatever ad SDK you bind.</td></tr>
+    <tr><td><code>IGameStateMachine</code></td><td><code>GameStateMachine</code></td><td><span class="tag tag-real">real</span></td><td>Async state machine; rejects re-entrant and concurrent transitions.</td></tr>
+    <tr><td><code>ITimeService</code></td><td><code>StubTimeService</code></td><td><span class="tag">stub</span></td><td><code>DateTime.UtcNow</code> only — <code>IsServerSynced</code> is always false.</td></tr>
+    <tr><td><code>ICrashlyticsService</code></td><td><code>MockCrashlyticsService</code></td><td><span class="tag">mock</span></td><td>Logs what it would report. Swap for Firebase / Sentry / Bugsnag.</td></tr>
+    <tr><td><code>IConsentService</code></td><td><code>MockConsentService</code></td><td><span class="tag">mock</span></td><td>Auto-approves GDPR and ATT. Must be replaced before store submission.</td></tr>
+    <tr><td><code>IRemoteConfigService</code></td><td><code>MockRemoteConfigService</code></td><td><span class="tag">mock</span></td><td>In-memory dictionary standing in for a live config backend.</td></tr>
+    <tr><td><code>IAnalyticsService</code></td><td><code>MockAnalyticsService</code></td><td><span class="tag">mock</span></td><td>Formats events to <code>Debug.Log</code> so you can see the payload.</td></tr>
+    <tr><td><code>IAttributionService</code></td><td><code>MockAttributionService</code></td><td><span class="tag">mock</span></td><td>Install source, UA campaign, ROAS purchase forwarding.</td></tr>
+    <tr><td><code>IAdsService</code></td><td><code>MockAdsService</code></td><td><span class="tag">mock</span></td><td>Auto-rewards after a short delay — useful for wiring reward flows.</td></tr>
+    <tr><td><code>IIAPService</code></td><td><code>MockIapService</code></td><td><span class="tag">mock</span></td><td>Auto-completes every purchase. Swap for Unity IAP 5.3.1+.</td></tr>
+    <tr><td><code>IReceiptValidator</code></td><td><code>StubReceiptValidator</code></td><td><span class="tag">stub</span></td><td><strong>Returns <code>true</code> unconditionally.</strong> See warning below.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="danger">
+  <p><strong><code>StubReceiptValidator</code> validates nothing.</strong> It ignores both the product id and the
+  receipt and returns <code>true</code> — a null receipt validates exactly as happily as a real one. It exists so the
+  purchase→reward path compiles end-to-end during prototyping. Shipping it means any client that can call your
+  purchase flow can grant itself every item in the game. Replace it with server-side validation before you take money.</p>
+</div>
+
+<h2 id="bus">9. The event bus</h2>
+
+<p>
+  <code>IEventBus</code> is how the peer tiers talk without referencing each other. Two methods:
+  <code>Observable&lt;T&gt; On&lt;T&gt;()</code> and <code>void Publish&lt;T&gt;(T evt)</code>, backed by a dictionary
+  of R3 <code>Subject&lt;T&gt;</code> behind a lock.
+</p>
+
+<p><strong>Two properties that bite if you assume otherwise:</strong></p>
+<ul>
+  <li><strong>Keyed by exact type.</strong> There is no polymorphic dispatch — subscribing to a base type will not
+    receive a derived one.</li>
+  <li><strong>No replay.</strong> A subscriber that arrives after a publish gets nothing. For bootstrap events in
+    particular, subscribe in <code>Awake</code>/<code>Start</code> of something with an execution order early enough
+    to beat the publisher.</li>
+</ul>
+
+<h3>Events that actually ship</h3>
+<div class="scroll">
+<table>
+  <thead><tr><th>Event</th><th>Assembly</th><th>Published when</th></tr></thead>
+  <tbody>
+    <tr><td><code>BootstrapFailed(StepName, Error, Attempt)</code></td><td>Zero.Core</td><td>A critical step aborts the pipeline.</td></tr>
+    <tr><td><code>BootstrapRetryRequested</code></td><td>Zero.Core</td><td>You publish it; <code>GameLauncher</code> re-runs the pipeline.</td></tr>
+    <tr><td><code>PopupOpened</code> · <code>PopupClosed</code></td><td>Zero.Core</td><td><code>UIService</code> pushes / pops the popup stack.</td></tr>
+    <tr><td><code>PopupBackdropTapped</code></td><td>Zero.Core</td><td>The user taps outside a popup.</td></tr>
+    <tr><td><code>LevelStarted</code> · <code>LevelCompleted</code> · <code>LevelFailed</code> · <code>LevelExited</code> · <code>LevelRestarted</code></td><td>Zero.Gameplay</td><td>Level lifecycle transitions.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="warn">
+  <p><strong>There is no app-lifecycle event.</strong> <code>AppPaused</code> and <code>AppQuitting</code> appear in
+  older docs and in the original plan, but no such type ships. Define your own POCO and publish it from a
+  MonoBehaviour's <code>OnApplicationPause</code> — see
+  <a href="liveops/version-check.md"><code>docs/liveops/version-check.md</code></a> for a working example.</p>
+</div>
+
+<h2>Where to go next</h2>
+<ul>
+  <li><a href="architecture/bootstrap-pipeline.md">Bootstrap pipeline</a> · <a href="architecture/asmdef-graph.md">Assembly graph</a> · <a href="architecture/event-bus.md">Event bus</a></li>
+  <li><a href="dev/PITFALLS.md">PITFALLS.md</a> — read before extending anything. Every entry came from a real bug.</li>
+  <li><a href="ui/ui-root.md">UI root</a> · <a href="ui/popup-stack.md">Popup stack</a> · <a href="ui/toast.md">Toasts</a> · <a href="ui/loading-screen.md">Loading screen</a></li>
+  <li><a href="security/save-encryption.md">Save encryption</a> · <a href="testing/writing-tests.md">Writing tests</a></li>
+</ul>
+
+</div>
+</body>
+</html>

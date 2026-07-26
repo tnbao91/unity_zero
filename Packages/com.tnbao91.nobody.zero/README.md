@@ -76,6 +76,8 @@ Full readme inside the sample bundle.
 
 ## Documentation
 
+**Start here** — [Flow &amp; Setup Guide](https://github.com/tnbao91/unity_zero/blob/main/docs/guide.html): one self-contained page covering the boot flow, the assembly map, setup, the extension seams and the full service catalogue.
+
 Full docs at the repo: <https://github.com/tnbao91/unity_zero/tree/main/docs>
 
 - Architecture: [event-bus](https://github.com/tnbao91/unity_zero/blob/main/docs/architecture/event-bus.md), [bootstrap-pipeline](https://github.com/tnbao91/unity_zero/blob/main/docs/architecture/bootstrap-pipeline.md), [asmdef-graph](https://github.com/tnbao91/unity_zero/blob/main/docs/architecture/asmdef-graph.md)
