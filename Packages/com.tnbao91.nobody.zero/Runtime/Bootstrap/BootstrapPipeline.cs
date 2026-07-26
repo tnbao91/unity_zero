@@ -100,8 +100,18 @@ namespace Zero.Bootstrap
 
             // Deliberately not awaited: the player goes now. Preserve() so the task can be
             // awaited more than once via DeferredCompletion.
-            _deferred = RunPhaseAsync(deferred, "deferred", null, ct, CancellationToken.None, reportProgress: false)
-                .Preserve();
+            _deferred = RunDeferredAsync(deferred, ct).Preserve();
+        }
+
+        private async UniTask RunDeferredAsync(IReadOnlyList<IBootstrapStep> deferred, CancellationToken ct)
+        {
+            // Yield first, always. Awaiting a completed UniTask continues inline, so a phase
+            // whose steps are all synchronous would otherwise run to completion inside this
+            // call — before RunAsync returns — which is exactly the blocking behaviour the
+            // phase split exists to prevent. One frame of latency here costs nothing; the
+            // player is already in the game.
+            await UniTask.Yield();
+            await RunPhaseAsync(deferred, "deferred", null, ct, CancellationToken.None, reportProgress: false);
         }
 
         private async UniTask RunPhaseAsync(
