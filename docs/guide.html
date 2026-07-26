@@ -234,10 +234,10 @@
   <tbody>
     <tr><td>1</td><td><code>CrashlyticsStep</code></td><td><code>"Crashlytics"</code></td><td><span class="tag">no</span></td><td><strong>5s</strong></td><td>First so it can observe every later failure. Not critical — a game that boots without crash reporting is still a game.</td></tr>
     <tr><td>2</td><td><code>LogStep</code></td><td><code>"Log"</code></td><td><span class="tag">no</span></td><td>30s</td><td>Later steps can log.</td></tr>
-    <tr><td>3</td><td><code>DeviceProfileStep</code></td><td><code>"DeviceProfile"</code></td><td><span class="tag tag-crit">CRITICAL</span></td><td>30s</td><td>Gates the quality tier everything after it reads.</td></tr>
+    <tr><td>3</td><td><code>DeviceProfileStep</code></td><td><code>"DeviceProfile"</code></td><td><span class="tag">no</span></td><td>30s</td><td>Gates the quality tier everything after it reads. Failure = Unity's default quality.</td></tr>
     <tr><td>4</td><td><code>SaveStep</code></td><td><code>"Save"</code></td><td><span class="tag">no</span></td><td>30s</td><td>Moved up so later steps can read persisted settings (volume, locale, consent).</td></tr>
-    <tr><td>5</td><td><code>AssetStep</code></td><td><code>"Asset"</code></td><td><span class="tag tag-crit">CRITICAL</span></td><td>30s</td><td>No Addressables, no game.</td></tr>
-    <tr><td>6</td><td><code>ConsentStep</code></td><td><code>"Consent"</code></td><td><span class="tag tag-crit">CRITICAL</span></td><td>30s</td><td>Legal gate — must resolve before anything tracks the user.</td></tr>
+    <tr><td>5</td><td><code>AssetStep</code></td><td><code>"Asset"</code></td><td><span class="tag">no</span></td><td>30s</td><td>Retried <strong>3×</strong> — the one worth retrying. Degrades rather than blocks; gate content on the report.</td></tr>
+    <tr><td>6</td><td><code>ConsentStep</code></td><td><code>"Consent"</code></td><td><span class="tag">no</span></td><td>30s</td><td>Failure must fall back to non-personalized, not to a blocked launch.</td></tr>
     <tr><td>7</td><td><code>RemoteConfigStep</code></td><td><code>"RemoteConfig"</code></td><td><span class="tag">no</span></td><td>30s</td><td></td></tr>
     <tr><td>8</td><td><code>AnalyticsStep</code></td><td><code>"Analytics"</code></td><td><span class="tag">no</span></td><td>30s</td><td></td></tr>
     <tr><td>9</td><td><code>LocalizationStep</code></td><td><code>"Localization"</code></td><td><span class="tag">no</span></td><td>30s</td><td>UI text ready before anything surfaces a localized error.</td></tr>
@@ -252,25 +252,69 @@
 </table>
 </div>
 
-<div class="warn">
-  <p><strong><code>CrashlyticsStep</code> is not critical.</strong> Several docs in this repo said it was the
-  <em>only</em> critical step, for a long time. It is <code>IsCritical =&gt; false</code>
-  (<code class="src">Steps/CrashlyticsStep.cs:17</code>). The three that abort bootstrap are
-  <strong>DeviceProfile, Asset and Consent</strong>. If you copied the old claim into your own notes, fix it there too.</p>
+<div class="note">
+  <p><strong>No shipped step is critical, and that is the design.</strong> Bootstrap never denies the player the
+  game: a step that fails degrades a feature, and the pipeline runs on.</p>
+  <p>This is a deliberate reversal — <code>DeviceProfile</code>, <code>Asset</code> and <code>Consent</code> were
+  critical until 0.6.0. The reason is below: an abort has nowhere good to land. A test pins the rule
+  (<code class="src">BootstrapDegradationTests</code>) so it cannot regress by accident.</p>
+  <p>The mechanism still exists for <em>your</em> steps. If your game genuinely cannot run without something — a
+  server login, say — override <code>IsCritical =&gt; true</code> on your own step, and build the retry screen that
+  has to go with it.</p>
 </div>
+
+<h3>Why nothing is critical</h3>
+
+<p>
+  Look at what an abort actually does. The pipeline stops, publishes <code>BootstrapFailed</code>, and
+  <code>GameLauncher</code> writes one <code>Debug.LogError</code>. That's the end of it —
+  <strong>nothing in the template subscribes to <code>BootstrapFailed</code></strong>, and
+  <code>LoadingScreenView</code> has no failure path. The retry UI that the design assumes is consumer work, and no
+  sample provides it.
+</p>
+<p>
+  So in a stock project, "critical" does not mean <em>a controlled stop</em>. It means <strong>the splash screen
+  sits there forever</strong>. For a hybrid-casual or puzzle game, where time-to-first-interaction is the number
+  that decides whether a player ever comes back, that is the worst possible outcome — and it was being triggered by
+  things like "quality settings failed to apply".
+</p>
+<p>
+  The fix isn't to swallow more failures, it's to stop pretending they didn't happen. A step that exhausts its
+  retries now records itself in <code>IBootstrapReport</code> and publishes
+  <code>BootstrapStepDegraded</code>. The player gets into the game; the game gets to decide what to switch off.
+</p>
+
+<pre><code>[Inject] private IBootstrapReport _report;
+
+private void Start()
+{
+    // The shop is the feature that needs IAP. Nothing else has to care.
+    _shopButton.gameObject.SetActive(!_report.IsDegraded("IAP"));
+
+    if (!_report.IsHealthy)
+        _log.Warn($"Booted degraded: {_report.Degraded.Count} step(s) failed");
+}</code></pre>
+
+<p>
+  Use the bus event when you want to react at the moment of failure, and the report when you are asking after the
+  fact — <code>R3EventBus</code> does not replay, so anything constructed after boot has already missed the event.
+  That is exactly why the durable record exists alongside it.
+</p>
 
 <h3>Failure, retry and timeout</h3>
 
-<p>Read from <code class="src">BootstrapPipeline.cs:48-91</code>:</p>
+<p>Read from <code class="src">BootstrapPipeline.cs</code>:</p>
 
 <ul>
   <li><strong>Attempts</strong> are <code>MaxRetries + 1</code> — <code>MaxRetries</code> counts <em>additional</em>
-    tries, and defaults to 1, so a step runs twice before giving up.</li>
-  <li><strong>A critical step never retries.</strong> The first failure calls <code>Abort()</code>, which throws
-    <code>BootstrapStepFailedException</code> and publishes <code>BootstrapFailed</code> on the bus with the step
-    name, the error and the attempt number.</li>
-  <li><strong>A non-critical step retries, then is swallowed.</strong> After exhausting attempts the pipeline logs
-    <code>"exhausted retries; continuing"</code> and moves on. Your game boots with that service degraded.</li>
+    tries, and defaults to 1, so a step runs twice before giving up. <code>AssetStep</code> overrides it to 2
+    (3 attempts), because a transient catalog fetch is the failure most worth retrying.</li>
+  <li><strong>A step that exhausts its attempts is recorded, announced, and passed.</strong> The pipeline logs
+    <code>"exhausted N attempt(s); continuing degraded"</code>, calls <code>IBootstrapReport.Record</code> and
+    publishes <code>BootstrapStepDegraded(StepName, Error, Attempts)</code>.</li>
+  <li><strong>A critical step — yours, not the template's — never retries.</strong> The first failure calls
+    <code>Abort()</code>, which throws <code>BootstrapStepFailedException</code> and publishes
+    <code>BootstrapFailed</code>. An abort is <em>not</em> recorded as a degradation; the two paths are distinct.</li>
   <li><strong>Timeout is cooperative, not a kill.</strong> Each attempt runs under a linked
     <code>CancellationTokenSource</code> with <code>CancelAfter(step.Timeout)</code>. A step that ignores its token
     keeps running — the pipeline just stops waiting. UniTask and Addressables both respect it.</li>
@@ -279,7 +323,8 @@
 
 <p>
   Retry is consumer-triggerable: publish <code>BootstrapRetryRequested</code> and <code>GameLauncher</code> re-runs
-  <code>RunAsync()</code>. There is no completed-step tracking, so <strong>every step runs again</strong> — steps must
+  <code>RunAsync()</code>. The report is cleared at the start of every run, so a successful retry clears the degraded
+  state. There is no completed-step tracking, so <strong>every step runs again</strong> — steps must
   be idempotent. Guard one-time side effects inside the service (<code>if (_initialized) return;</code>), not in the step.
 </p>
 
@@ -609,7 +654,8 @@
 <table>
   <thead><tr><th>Event</th><th>Assembly</th><th>Published when</th></tr></thead>
   <tbody>
-    <tr><td><code>BootstrapFailed(StepName, Error, Attempt)</code></td><td>Zero.Core</td><td>A critical step aborts the pipeline.</td></tr>
+    <tr><td><code>BootstrapStepDegraded(StepName, Error, Attempts)</code></td><td>Zero.Core</td><td>A step exhausted its retries. The pipeline continues; the durable equivalent is <code>IBootstrapReport</code>.</td></tr>
+    <tr><td><code>BootstrapFailed(StepName, Error, Attempt)</code></td><td>Zero.Core</td><td>A <em>critical</em> step aborted the pipeline. No shipped step is critical, so this only fires for steps you add.</td></tr>
     <tr><td><code>BootstrapRetryRequested</code></td><td>Zero.Core</td><td>You publish it; <code>GameLauncher</code> re-runs the pipeline.</td></tr>
     <tr><td><code>PopupOpened</code> · <code>PopupClosed</code></td><td>Zero.Core</td><td><code>UIService</code> pushes / pops the popup stack.</td></tr>
     <tr><td><code>PopupBackdropTapped</code></td><td>Zero.Core</td><td>The user taps outside a popup.</td></tr>

@@ -14,21 +14,27 @@ namespace Zero.Bootstrap
         private readonly ILogService _log;
         private readonly IBootstrapProgressReporter _reporter;
         private readonly IEventBus _eventBus;
+        private readonly IBootstrapReport _report;
 
         public BootstrapPipeline(
             IReadOnlyList<IBootstrapStep> steps,
             ILogService log,
             IBootstrapProgressReporter reporter,
-            IEventBus eventBus = null)
+            IEventBus eventBus = null,
+            IBootstrapReport report = null)
         {
             _steps = steps;
             _log = log;
             _reporter = reporter;
             _eventBus = eventBus;
+            _report = report;
         }
 
         public async UniTask RunAsync(IProgress<float> overallProgress, CancellationToken ct)
         {
+            // A retry re-runs every step, so last run's failures must not stick.
+            _report?.Clear();
+
             for (int i = 0; i < _steps.Count; i++)
             {
                 var step = _steps[i];
@@ -81,8 +87,13 @@ namespace Zero.Bootstrap
 
                 if (!succeeded && lastError != null)
                 {
-                    // Non-critical: swallow after exhausting retries so the rest of the pipeline runs.
-                    _log.Warn($"[Bootstrap] Step '{step.Name}' exhausted retries; continuing.");
+                    // Non-critical: continue so the player still reaches the game. Not
+                    // silent, though — record it durably and announce it, so a feature
+                    // that depends on this service can turn itself off instead of
+                    // failing in the player's hands.
+                    _log.Warn($"[Bootstrap] Step '{step.Name}' exhausted {attempts} attempt(s); continuing degraded.");
+                    _report?.Record(step.Name, lastError, attempts);
+                    _eventBus?.Publish(new BootstrapStepDegraded(step.Name, lastError, attempts));
                 }
 
                 float done = (i + 1f) / _steps.Count;

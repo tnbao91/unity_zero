@@ -42,7 +42,7 @@ Apply the same rule in YOUR game when subsystems should be loosely coupled. Only
 `BootstrapPipeline` runs 16 sequential `IBootstrapStep` items at app start:
 
 ```
-1.  Crashlytics       (critical — aborts on fail)
+1.  Crashlytics       (first, so it sees later failures — non-critical)
 2.  Log
 3.  DeviceProfile
 4.  Save              (early so later steps can read settings)
@@ -62,8 +62,9 @@ Apply the same rule in YOUR game when subsystems should be loosely coupled. Only
 
 Each step:
 - Has a **timeout** (default 30s, override per step).
-- Retries on non-critical failure (default 1 retry).
-- Aborts pipeline only if `IsCritical = true` (Crashlytics only).
+- Retries on failure (default 1 retry), then records the step in `IBootstrapReport` and publishes `BootstrapStepDegraded` — the pipeline continues so the player always reaches the game.
+- **No shipped step is critical.** `IsCritical = true` aborts the pipeline and is reserved for YOUR steps that genuinely gate the game; if you set it, ship the retry screen too.
+- Read `IBootstrapReport.IsDegraded("IAP")` to switch off a feature whose service failed to init.
 - Reports progress to `IBootstrapProgressReporter` (Singleton).
 
 Consumer reads progress via `IBootstrapProgressReporter.Progress` Observable for loading screens.
